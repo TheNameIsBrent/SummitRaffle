@@ -142,4 +142,45 @@ public final class Messages {
                         .color(NamedTextColor.YELLOW))
                 .append(Component.text(". Drawing winner...").color(NamedTextColor.GRAY));
     }
+
+    /** Broadcast when a winner is drawn. */
+    public static Component raffleWinner(String winnerName, String prizeName) {
+        return Component.empty()
+                .append(Component.newline())
+                .append(Component.text("  ✦ RAFFLE WINNER ✦  ").color(NamedTextColor.GOLD)
+                        .decorate(TextDecoration.BOLD))
+                .append(Component.newline())
+                .append(Component.text("  Winner: ").color(NamedTextColor.GRAY))
+                .append(Component.text(winnerName).color(NamedTextColor.YELLOW)
+                        .decorate(TextDecoration.BOLD))
+                .append(Component.newline())
+                .append(Component.text("  Prize:  ").color(NamedTextColor.GRAY))
+                .append(Component.text(prizeName).color(NamedTextColor.AQUA)
+                        .decorate(TextDecoration.BOLD))
+                .append(Component.newline())
+                .append(Component.text("  Congratulations!").color(NamedTextColor.GREEN))
+                .append(Component.newline());
+    }
+
+    /** Broadcast when nobody entered and the item is returned. */
+    public static Component raffleNoParticipants(String prizeName) {
+        return Component.empty()
+                .append(Component.text("[Raffle] ").color(NamedTextColor.GOLD))
+                .append(Component.text("The raffle for ").color(NamedTextColor.GRAY))
+                .append(Component.text(prizeName).color(NamedTextColor.AQUA))
+                .append(Component.text(" ended with no participants. Item returned to the host.")
+                        .color(NamedTextColor.GRAY));
+    }
+
+    /** Sent privately to the creator when their item is returned. */
+    public static String prizeReturnedToCreator(String prizeName) {
+        return PREFIX + GREEN + "No one entered — your " + YELLOW + prizeName
+                + GREEN + " has been returned to your inventory.";
+    }
+
+    /** Sent privately to the winner when their inventory was full and the item dropped. */
+    public static String inventoryFullItemDropped(String itemName) {
+        return PREFIX + YELLOW + "Your inventory was full! Your prize ("
+                + itemName + ") has been dropped at your feet.";
+    }
 }

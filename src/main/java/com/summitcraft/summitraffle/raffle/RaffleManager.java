@@ -26,6 +26,7 @@ public class RaffleManager {
 
     private final JavaPlugin plugin;
     private final Logger logger;
+    private final WinnerResolver winnerResolver;
 
     private Raffle activeRaffle;
     private int countdownTaskId = -1;
@@ -33,6 +34,7 @@ public class RaffleManager {
     public RaffleManager(JavaPlugin plugin) {
         this.plugin = plugin;
         this.logger = plugin.getLogger();
+        this.winnerResolver = new WinnerResolver(logger);
     }
 
     // -------------------------------------------------------------------------
@@ -136,7 +138,7 @@ public class RaffleManager {
                             finished.getPrizeName(), finished.getParticipantCount()));
                     Bukkit.broadcast(Messages.raffleClosedComponent(
                             finished.getPrizeName(), finished.getParticipantCount()));
-                    // Winner selection will be wired in next iteration
+                    winnerResolver.resolve(finished);
                     return;
                 }
 
