@@ -1,0 +1,20 @@
+name: SummitRaffle
+version: '${project.version}'
+main: com.summitcraft.summitraffle.SummitRaffle
+api-version: '1.21'
+description: A raffle plugin for SummitCraft
+authors: [ SummitCraft ]
+
+commands:
+  raffle:
+    description: Main raffle command.
+    usage: /raffle <start|join>
+    aliases: [ rf ]
+
+permissions:
+  raffle.start:
+    description: Allows starting and stopping raffles.
+    default: op
+  raffle.join:
+    description: Allows joining an active raffle.
+    default: true
