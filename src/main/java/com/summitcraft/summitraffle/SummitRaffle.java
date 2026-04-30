@@ -3,21 +3,31 @@ package com.summitcraft.summitraffle;
 import com.summitcraft.summitraffle.command.Messages;
 import com.summitcraft.summitraffle.command.RaffleCommand;
 import com.summitcraft.summitraffle.config.ConfigManager;
+import com.summitcraft.summitraffle.cooldown.CooldownManager;
+import com.summitcraft.summitraffle.prize.PendingPrizeManager;
 import com.summitcraft.summitraffle.raffle.RaffleManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class SummitRaffle extends JavaPlugin {
 
     private static SummitRaffle instance;
+
     private ConfigManager configManager;
+    private CooldownManager cooldownManager;
+    private PendingPrizeManager pendingPrizeManager;
     private RaffleManager raffleManager;
 
     @Override
     public void onEnable() {
         instance = this;
-        configManager = new ConfigManager(this);
-        Messages.setPrefix(configManager.getPrefix());
-        raffleManager = new RaffleManager(this);
+
+        configManager      = new ConfigManager(this);
+        Messages.init(configManager);
+
+        cooldownManager    = new CooldownManager(configManager);
+        pendingPrizeManager = new PendingPrizeManager(this);
+        raffleManager      = new RaffleManager(this, pendingPrizeManager);
+
         registerCommands();
         getLogger().info("SummitRaffle has been enabled!");
     }
@@ -32,24 +42,18 @@ public final class SummitRaffle extends JavaPlugin {
         instance = null;
     }
 
-    public static SummitRaffle getInstance() {
-        return instance;
-    }
-
-    public ConfigManager getConfigManager() {
-        return configManager;
-    }
-
-    public RaffleManager getRaffleManager() {
-        return raffleManager;
-    }
+    public static SummitRaffle getInstance()          { return instance; }
+    public ConfigManager getConfigManager()           { return configManager; }
+    public CooldownManager getCooldownManager()       { return cooldownManager; }
+    public PendingPrizeManager getPendingPrizeManager(){ return pendingPrizeManager; }
+    public RaffleManager getRaffleManager()           { return raffleManager; }
 
     private void registerCommands() {
-        RaffleCommand raffleCommand = new RaffleCommand(raffleManager);
-        var cmd = getCommand("raffle");
-        if (cmd != null) {
-            cmd.setExecutor(raffleCommand);
-            cmd.setTabCompleter(raffleCommand);
+        RaffleCommand cmd = new RaffleCommand(raffleManager, cooldownManager);
+        var bukkitCmd = getCommand("raffle");
+        if (bukkitCmd != null) {
+            bukkitCmd.setExecutor(cmd);
+            bukkitCmd.setTabCompleter(cmd);
         }
     }
 }

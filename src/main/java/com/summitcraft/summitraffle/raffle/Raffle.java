@@ -30,7 +30,7 @@ public class Raffle {
             throw new IllegalArgumentException("Creator UUID must not be null.");
         }
 
-        this.prizeItem = prizeItem.clone(); // full stack, quantity preserved
+        this.prizeItem = ItemStack.deserializeBytes(prizeItem.serializeAsBytes()); // full NBT-safe deep copy
         this.creatorUUID = creatorUUID;
         this.startTime = Instant.now();
         this.participants = Collections.synchronizedSet(new LinkedHashSet<>());
@@ -69,9 +69,9 @@ public class Raffle {
     // Accessors
     // -------------------------------------------------------------------------
 
-    /** Returns a defensive copy of the prize item so callers cannot mutate it. */
+    /** Returns a deep copy of the prize item so callers cannot mutate stored NBT. */
     public ItemStack getPrizeItem() {
-        return prizeItem.clone();
+        return ItemStack.deserializeBytes(prizeItem.serializeAsBytes());
     }
 
     /**

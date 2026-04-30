@@ -31,10 +31,10 @@ public class RaffleManager {
     private Raffle activeRaffle;
     private int countdownTaskId = -1;
 
-    public RaffleManager(JavaPlugin plugin) {
+    public RaffleManager(JavaPlugin plugin, com.summitcraft.summitraffle.prize.PendingPrizeManager pendingPrizeManager) {
         this.plugin = plugin;
         this.logger = plugin.getLogger();
-        this.winnerResolver = new WinnerResolver(logger);
+        this.winnerResolver = new WinnerResolver(logger, pendingPrizeManager);
     }
 
     // -------------------------------------------------------------------------
@@ -136,9 +136,25 @@ public class RaffleManager {
                     countdownTaskId = -1;
                     logger.info(String.format("Raffle countdown finished — prize: '%s' | participants: %d",
                             finished.getPrizeName(), finished.getParticipantCount()));
+
+                    // Broadcast entries closed, then wait 3 seconds before drawing
                     Bukkit.broadcast(Messages.raffleClosedComponent(
                             finished.getPrizeName(), finished.getParticipantCount()));
-                    winnerResolver.resolve(finished);
+
+                    // 1s later: "Drawing winner..."
+                    new BukkitRunnable() {
+                        @Override public void run() {
+                            Bukkit.broadcast(Messages.raffleDrawing());
+                        }
+                    }.runTaskLater(plugin, 20L);
+
+                    // 3s later: reveal winner and deliver prize
+                    new BukkitRunnable() {
+                        @Override
+                        public void run() {
+                            winnerResolver.resolve(finished);
+                        }
+                    }.runTaskLater(plugin, 3 * 20L);
                     return;
                 }
 

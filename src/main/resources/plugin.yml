@@ -18,3 +18,12 @@ permissions:
   raffle.join:
     description: Allows joining an active raffle.
     default: true
+  raffle.default:
+    description: Default cooldown tier (300s unless overridden in config).
+    default: true
+  raffle.vip:
+    description: VIP cooldown tier (180s by default).
+    default: false
+  raffle.mvp:
+    description: MVP cooldown tier (60s by default).
+    default: false

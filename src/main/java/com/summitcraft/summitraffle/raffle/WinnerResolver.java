@@ -1,13 +1,14 @@
 package com.summitcraft.summitraffle.raffle;
 
 import com.summitcraft.summitraffle.command.Messages;
+import com.summitcraft.summitraffle.prize.PendingPrizeManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -16,143 +17,102 @@ import java.util.logging.Logger;
 /**
  * Resolves the outcome of a finished raffle.
  *
- * <p>Responsibilities:</p>
- * <ul>
- *   <li>Pick a random winner from the participant set.</li>
- *   <li>Deliver the prize to the winner's inventory, or drop it at their
- *       feet if their inventory is full.</li>
- *   <li>If nobody entered, return the item to the creator (or drop it at
- *       their location if they're offline / have a full inventory).</li>
- *   <li>Broadcast the result server-wide.</li>
- * </ul>
- *
- * <p>This class is intentionally stateless — all inputs come from the
- * finished {@link Raffle} so it can be unit-tested independently.</p>
+ * <p>Offline players (winner or creator) have their item queued in
+ * {@link PendingPrizeManager} so nothing is lost — it is delivered on next login.</p>
  */
 public class WinnerResolver {
 
     private static final Random RANDOM = new Random();
 
     private final Logger logger;
+    private final PendingPrizeManager pendingPrizeManager;
 
-    public WinnerResolver(Logger logger) {
+    public WinnerResolver(Logger logger, PendingPrizeManager pendingPrizeManager) {
         this.logger = logger;
+        this.pendingPrizeManager = pendingPrizeManager;
     }
 
-    // -------------------------------------------------------------------------
-    // Public API
-    // -------------------------------------------------------------------------
+    // ── Public API ────────────────────────────────────────────────────────────
 
-    /**
-     * Resolves the finished raffle: picks a winner (or returns the item to the
-     * creator if there are no participants), delivers the prize, and broadcasts.
-     *
-     * @param raffle the completed raffle
-     */
     public void resolve(Raffle raffle) {
         Set<UUID> participants = raffle.getParticipants();
-
         if (participants.isEmpty()) {
+            handleNoParticipants(raffle);
+        } else {
+            handleWinner(raffle, new LinkedHashSet<>(participants));
+        }
+    }
+
+    // ── No-participants path ──────────────────────────────────────────────────
+
+    private void handleNoParticipants(Raffle raffle) {
+        Bukkit.broadcast(Messages.raffleNoParticipants(raffle.getPrizeName()));
+        logger.info("Raffle ended with no participants — prize: " + raffle.getPrizeName());
+        deliverOrQueue(raffle.getCreatorUUID(), raffle.getPrizeItem(), raffle.getPrizeName(), true);
+    }
+
+    // ── Winner path ───────────────────────────────────────────────────────────
+
+    private void handleWinner(Raffle raffle, Set<UUID> pool) {
+        if (pool.isEmpty()) {
+            // All entrants went offline — fall back to returning to creator
             handleNoParticipants(raffle);
             return;
         }
 
-        UUID winnerUUID = pickRandom(participants);
-        handleWinner(raffle, winnerUUID);
-    }
-
-    // -------------------------------------------------------------------------
-    // No-participants path
-    // -------------------------------------------------------------------------
-
-    private void handleNoParticipants(Raffle raffle) {
-        ItemStack prize = raffle.getPrizeItem();
-        UUID creatorUUID = raffle.getCreatorUUID();
-
-        Bukkit.broadcast(Messages.raffleNoParticipants(raffle.getPrizeName()));
-        logger.info(String.format("Raffle ended with no participants — returning '%s' to creator %s",
-                raffle.getPrizeName(), creatorUUID));
-
-        Player creator = Bukkit.getPlayer(creatorUUID);
-        if (creator != null && creator.isOnline()) {
-            deliverItem(creator, prize);
-            creator.sendMessage(Messages.prizeReturnedToCreator(raffle.getPrizeName()));
-        } else {
-            // Creator is offline — the item would be lost; log it clearly
-            logger.warning(String.format(
-                    "Creator %s is offline — prize '%s' could not be returned. Item dropped at spawn.",
-                    creatorUUID, raffle.getPrizeName()));
-            // Drop at world spawn as a last resort so nothing is silently deleted
-            var spawnWorld = Bukkit.getWorlds().get(0);
-            spawnWorld.dropItemNaturally(spawnWorld.getSpawnLocation(), prize);
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Winner path
-    // -------------------------------------------------------------------------
-
-    private void handleWinner(Raffle raffle, UUID winnerUUID) {
-        ItemStack prize = raffle.getPrizeItem();
+        UUID winnerUUID = pickRandom(pool);
         Player winner = Bukkit.getPlayer(winnerUUID);
 
         if (winner != null && winner.isOnline()) {
-            deliverItem(winner, prize);
             Bukkit.broadcast(Messages.raffleWinner(winner.getName(), raffle.getPrizeName()));
-            logger.info(String.format("Raffle winner: %s — prize: '%s'",
-                    winner.getName(), raffle.getPrizeName()));
+            logger.info("Raffle winner: " + winner.getName() + " — prize: " + raffle.getPrizeName());
+            deliverOrQueue(winnerUUID, raffle.getPrizeItem(), raffle.getPrizeName(), false);
         } else {
-            // Winner logged off between joining and the draw — pick again or drop at spawn
-            logger.warning(String.format(
-                    "Chosen winner %s is offline — re-drawing from remaining participants.",
-                    winnerUUID));
-
-            Set<UUID> remaining = raffle.getParticipants();
-            remaining = removeFromSet(remaining, winnerUUID);
-
-            if (remaining.isEmpty()) {
-                // Everyone who entered is offline — treat as no-participants
-                handleNoParticipants(raffle);
-            } else {
-                // Recurse with a reduced participant snapshot — safe, bounded by participant count
-                UUID nextWinner = pickRandom(remaining);
-                handleWinner(raffle, nextWinner);
-            }
+            // Winner offline — re-draw from remaining pool
+            logger.warning("Chosen winner " + winnerUUID + " is offline — re-drawing.");
+            pool.remove(winnerUUID);
+            // Queue for the offline player anyway (they still won; we just re-draw for broadcast)
+            pendingPrizeManager.queuePrize(winnerUUID, raffle.getPrizeItem());
+            Bukkit.broadcast(Messages.raffleWinner(winnerUUID.toString(), raffle.getPrizeName()));
+            handleWinner(raffle, pool);
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Prize delivery
-    // -------------------------------------------------------------------------
+    // ── Delivery ──────────────────────────────────────────────────────────────
 
     /**
-     * Attempts to add the item to the player's inventory.
-     * If the inventory is full, drops it naturally at their feet instead.
+     * Tries to give the item to an online player. If they're offline or their
+     * inventory is full, queues it in {@link PendingPrizeManager}.
+     *
+     * @param isCreator true when returning to creator (no-participants case)
      */
-    private void deliverItem(Player player, ItemStack prize) {
-        Map<Integer, ItemStack> overflow = player.getInventory().addItem(prize);
+    private void deliverOrQueue(UUID recipientUUID, ItemStack prize, String prizeName, boolean isCreator) {
+        Player recipient = Bukkit.getPlayer(recipientUUID);
+
+        if (recipient == null || !recipient.isOnline()) {
+            // Offline — persist for next login
+            pendingPrizeManager.queuePrize(recipientUUID, prize);
+            logger.info("Recipient " + recipientUUID + " is offline — prize queued for next login.");
+            return;
+        }
+
+        if (isCreator) {
+            recipient.sendMessage(Messages.prizeReturnedToCreator(prizeName));
+        }
+
+        var overflow = recipient.getInventory().addItem(prize);
         if (!overflow.isEmpty()) {
-            // Inventory full — drop every overflow stack at the player's location
             for (ItemStack dropped : overflow.values()) {
-                player.getWorld().dropItemNaturally(player.getLocation(), dropped);
+                recipient.getWorld().dropItemNaturally(recipient.getLocation(), dropped);
             }
-            player.sendMessage(Messages.inventoryFullItemDropped(prize.getType().name()));
+            recipient.sendMessage(Messages.inventoryFullItemDropped(prize.getType().name()));
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private UUID pickRandom(Set<UUID> uuids) {
         List<UUID> list = new ArrayList<>(uuids);
         return list.get(RANDOM.nextInt(list.size()));
-    }
-
-    /** Returns a new set with the given UUID removed (does not mutate the original). */
-    private Set<UUID> removeFromSet(Set<UUID> original, UUID toRemove) {
-        var copy = new java.util.LinkedHashSet<>(original);
-        copy.remove(toRemove);
-        return copy;
     }
 }

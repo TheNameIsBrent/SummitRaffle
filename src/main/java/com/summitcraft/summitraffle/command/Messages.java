@@ -1,186 +1,156 @@
 package com.summitcraft.summitraffle.command;
 
+import com.summitcraft.summitraffle.config.ConfigManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
 /**
- * Central store for all player-facing messages.
+ * Thin facade over {@link ConfigManager} that builds player-facing strings and
+ * Adventure Components.
  *
- * <p>The prefix is injected at startup (and on reload) from config.yml via
- * {@link #setPrefix(String)}. Per-player feedback uses legacy §-codes for
- * simplicity. Rich server-wide broadcasts use the Adventure API.</p>
+ * <p>All text originates from config.yml — nothing is hard-coded here except
+ * the Adventure event wiring (click/hover) which cannot be expressed in plain
+ * strings.</p>
+ *
+ * <h3>Centering</h3>
+ * <p>Lines intended for centered display are padded with spaces using a fixed
+ * chat-pixel budget (Minecraft's default chat width is 320px; a regular space
+ * is 4px wide). This is a best-effort approximation — proportional fonts and
+ * chat scaling mean exact centering is impossible server-side.</p>
  */
 public final class Messages {
 
     private Messages() {}
 
-    // Injected from config.yml on enable
-    private static String PREFIX = "§6[SummitRaffle] §r";
+    private static ConfigManager config;
 
-    /** Called by the main plugin class after loading config.yml. */
-    public static void setPrefix(String prefix) {
-        PREFIX = prefix.endsWith(" ") ? prefix : prefix + " ";
+    /** Called once on enable (and again on reload) by the main plugin class. */
+    public static void init(ConfigManager configManager) {
+        config = configManager;
     }
 
-    // ── Colour shorthands ─────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private static final String RED    = "§c";
-    private static final String GREEN  = "§a";
-    private static final String YELLOW = "§e";
-    private static final String GRAY   = "§7";
+    /** Fetches a message, replaces {prefix}, and substitutes key=value pairs. */
+    private static String msg(String key, String... replacements) {
+        String s = config.getMessage(key);
+        for (int i = 0; i + 1 < replacements.length; i += 2) {
+            s = s.replace("{" + replacements[i] + "}", replacements[i + 1]);
+        }
+        return s;
+    }
+
+    /** Converts a §-coded string to an Adventure Component. */
+    private static Component comp(String key, String... replacements) {
+        return LegacyComponentSerializer.legacySection().deserialize(msg(key, replacements));
+    }
+
+    /**
+     * Pads a §-coded string with leading spaces so it appears roughly centered
+     * in the default 320px Minecraft chat window.
+     * Each regular space character ≈ 4px; average character ≈ 6px.
+     */
+    private static Component centered(String key, String... replacements) {
+        String text = msg(key, replacements);
+        // Strip §-codes to measure plain length
+        String plain = text.replaceAll("§[0-9a-fk-orA-FK-OR]", "");
+        int chatWidth = 320;
+        int textWidth = plain.length() * 6; // rough average px per char
+        int padding = Math.max(0, (chatWidth - textWidth) / 2) / 4; // spaces (4px each)
+        String padded = " ".repeat(padding) + text;
+        return LegacyComponentSerializer.legacySection().deserialize(padded);
+    }
 
     // ── Per-player feedback ───────────────────────────────────────────────────
 
-    public static String usage()               { return PREFIX + GRAY   + "Usage: /raffle <start|join>"; }
-    public static String noPermission()        { return PREFIX + RED    + "You don't have permission to do that."; }
-    public static String playersOnly()         { return PREFIX + RED    + "Only players can use this command."; }
-    public static String raffleAlreadyActive() { return PREFIX + RED    + "A raffle is already running!"; }
-    public static String mustHoldItem()        { return PREFIX + RED    + "Hold the item you want to raffle in your main hand."; }
-    public static String joinSuccess()         { return PREFIX + GREEN  + "You have entered the raffle. Good luck!"; }
-    public static String alreadyJoined()       { return PREFIX + YELLOW + "You have already entered this raffle."; }
-    public static String creatorCannotJoin()   { return PREFIX + RED    + "You cannot join your own raffle."; }
-    public static String noActiveRaffle()      { return PREFIX + RED    + "There is no active raffle right now."; }
+    public static String usage()               { return msg("usage"); }
+    public static String noPermission()        { return msg("no-permission"); }
+    public static String playersOnly()         { return msg("players-only"); }
+    public static String raffleAlreadyActive() { return msg("raffle-already-active"); }
+    public static String mustHoldItem()        { return msg("must-hold-item"); }
+    public static String joinSuccess()         { return msg("join-success"); }
+    public static String alreadyJoined()       { return msg("already-joined"); }
+    public static String creatorCannotJoin()   { return msg("creator-cannot-join"); }
+    public static String noActiveRaffle()      { return msg("no-active-raffle"); }
+    public static String onCooldown(int secs)  { return msg("on-cooldown", "seconds", String.valueOf(secs)); }
+    public static String prizeReturnedToCreator(String prize) { return msg("prize-returned", "prize", prize); }
+    public static String inventoryFullItemDropped(String item) { return msg("inventory-full-drop", "item", item); }
+    public static String pendingPrizeReceived(String prize)   { return msg("pending-prize-received", "prize", prize); }
+    public static String pendingPrizeFull(String item)        { return msg("pending-prize-full", "prize", item); }
 
-    // ── Adventure Components (rich server-wide broadcasts) ───────────────────
+    // ── Adventure broadcasts ──────────────────────────────────────────────────
 
-    /**
-     * Large opening announcement with prize, starter name, and a clickable join button.
-     *
-     * <pre>
-     * ══════════════════════════════════
-     *        ✦ RAFFLE STARTED ✦
-     *   Prize:      64x Diamond
-     *   Started by: Steve
-     *
-     *       [ Click here to join! ]
-     *
-     *   ⚠ Make sure you have a free
-     *     inventory slot to receive
-     *     your prize if you win!
-     * ══════════════════════════════════
-     * </pre>
-     */
+    /** Centered opening announcement with prize, starter, and clickable join button. */
     public static Component raffleStartedComponent(String prizeName, String starterName) {
-        Component separator = Component.text("══════════════════════════════════")
-                .color(NamedTextColor.GOLD);
+        String hoverText  = msg("announce-join-hover");
+        String buttonText = msg("announce-join-button");
 
-        Component header = Component.text("        ✦ RAFFLE STARTED ✦")
-                .color(NamedTextColor.YELLOW)
-                .decorate(TextDecoration.BOLD);
-
-        Component prizeLabel = Component.empty()
-                .append(Component.text("  Prize:      ").color(NamedTextColor.GRAY))
-                .append(Component.text(prizeName).color(NamedTextColor.AQUA)
-                        .decorate(TextDecoration.BOLD));
-
-        Component starterLabel = Component.empty()
-                .append(Component.text("  Started by: ").color(NamedTextColor.GRAY))
-                .append(Component.text(starterName).color(NamedTextColor.WHITE)
-                        .decorate(TextDecoration.BOLD));
-
-        Component joinButton = Component.text("       [ Click here to join! ]")
-                .color(NamedTextColor.GREEN)
-                .decorate(TextDecoration.BOLD)
+        Component joinButton = LegacyComponentSerializer.legacySection()
+                .deserialize(buttonText)
                 .clickEvent(ClickEvent.runCommand("/raffle join"))
                 .hoverEvent(HoverEvent.showText(
-                        Component.text("Click to join the raffle!")
-                                .color(NamedTextColor.YELLOW)));
-
-        Component warning = Component.empty()
-                .append(Component.text("  ⚠ ").color(NamedTextColor.RED)
-                        .decorate(TextDecoration.BOLD))
-                .append(Component.text("Make sure you have a free inventory slot")
-                        .color(NamedTextColor.RED))
-                .append(Component.newline())
-                .append(Component.text("    to receive your prize if you win!")
-                        .color(NamedTextColor.RED));
+                        LegacyComponentSerializer.legacySection().deserialize(hoverText)));
 
         return Component.empty()
                 .append(Component.newline())
-                .append(separator).append(Component.newline())
-                .append(header).append(Component.newline())
-                .append(prizeLabel).append(Component.newline())
-                .append(starterLabel).append(Component.newline())
+                .append(centered("announce-separator")).append(Component.newline())
+                .append(centered("announce-header")).append(Component.newline())
+                .append(centered("announce-prize",      "prize",  prizeName)).append(Component.newline())
+                .append(centered("announce-started-by", "player", starterName)).append(Component.newline())
                 .append(Component.newline())
-                .append(joinButton).append(Component.newline())
+                .append(centered(buttonText, joinButton))
                 .append(Component.newline())
-                .append(warning).append(Component.newline())
-                .append(separator)
+                .append(Component.newline())
+                .append(centered("announce-warning")).append(Component.newline())
+                .append(centered("announce-separator"))
                 .append(Component.newline());
     }
 
-    /** Countdown reminder — broadcast at 30s, 20s, 10s, 5-1s. */
+    /** Countdown reminder with clickable join text. */
     public static Component raffleCountdownComponent(String prizeName, int secondsLeft) {
-        NamedTextColor timeColor = secondsLeft <= 5 ? NamedTextColor.RED : NamedTextColor.YELLOW;
+        String hoverText   = msg("countdown-hover");
+        String full = msg("countdown", "seconds", String.valueOf(secondsLeft), "prize", prizeName);
 
-        return Component.empty()
-                .append(Component.text("[Raffle] ").color(NamedTextColor.GOLD))
-                .append(Component.text(secondsLeft + "s ").color(timeColor)
-                        .decorate(TextDecoration.BOLD))
-                .append(Component.text("remaining for ").color(NamedTextColor.GRAY))
-                .append(Component.text(prizeName).color(NamedTextColor.AQUA))
-                .append(Component.text(" — ").color(NamedTextColor.GRAY))
-                .append(Component.text("Click to join!")
-                        .color(NamedTextColor.GREEN)
-                        .clickEvent(ClickEvent.runCommand("/raffle join"))
-                        .hoverEvent(HoverEvent.showText(
-                                Component.text("Click to join the raffle!")
-                                        .color(NamedTextColor.YELLOW))));
+        // Make the whole line clickable
+        return LegacyComponentSerializer.legacySection().deserialize(full)
+                .clickEvent(ClickEvent.runCommand("/raffle join"))
+                .hoverEvent(HoverEvent.showText(
+                        LegacyComponentSerializer.legacySection().deserialize(hoverText)));
     }
 
-    /** Broadcast when the entry window closes and a winner is about to be drawn. */
-    public static Component raffleClosedComponent(String prizeName, int participantCount) {
-        return Component.empty()
-                .append(Component.text("[Raffle] ").color(NamedTextColor.GOLD))
-                .append(Component.text("Entries closed for ").color(NamedTextColor.GRAY))
-                .append(Component.text(prizeName).color(NamedTextColor.AQUA))
-                .append(Component.text(" — ").color(NamedTextColor.GRAY))
-                .append(Component.text(participantCount + " participant(s)")
-                        .color(NamedTextColor.YELLOW))
-                .append(Component.text(". Drawing winner...").color(NamedTextColor.GRAY));
+    public static Component raffleClosedComponent(String prizeName, int count) {
+        return comp("entries-closed", "prize", prizeName, "count", String.valueOf(count));
     }
 
-    /** Broadcast when a winner is drawn. */
+    public static Component raffleDrawing() {
+        return comp("drawing");
+    }
+
+    /** Centered winner announcement panel. */
     public static Component raffleWinner(String winnerName, String prizeName) {
         return Component.empty()
                 .append(Component.newline())
-                .append(Component.text("  ✦ RAFFLE WINNER ✦  ").color(NamedTextColor.GOLD)
-                        .decorate(TextDecoration.BOLD))
-                .append(Component.newline())
-                .append(Component.text("  Winner: ").color(NamedTextColor.GRAY))
-                .append(Component.text(winnerName).color(NamedTextColor.YELLOW)
-                        .decorate(TextDecoration.BOLD))
-                .append(Component.newline())
-                .append(Component.text("  Prize:  ").color(NamedTextColor.GRAY))
-                .append(Component.text(prizeName).color(NamedTextColor.AQUA)
-                        .decorate(TextDecoration.BOLD))
-                .append(Component.newline())
-                .append(Component.text("  Congratulations!").color(NamedTextColor.GREEN))
+                .append(centered("winner-separator")).append(Component.newline())
+                .append(centered("winner-header")).append(Component.newline())
+                .append(centered("winner-name",   "player", winnerName)).append(Component.newline())
+                .append(centered("winner-prize",  "prize",  prizeName)).append(Component.newline())
+                .append(centered("winner-congrats")).append(Component.newline())
+                .append(centered("winner-separator"))
                 .append(Component.newline());
     }
 
-    /** Broadcast when nobody entered and the item is returned. */
     public static Component raffleNoParticipants(String prizeName) {
-        return Component.empty()
-                .append(Component.text("[Raffle] ").color(NamedTextColor.GOLD))
-                .append(Component.text("The raffle for ").color(NamedTextColor.GRAY))
-                .append(Component.text(prizeName).color(NamedTextColor.AQUA))
-                .append(Component.text(" ended with no participants. Item returned to the host.")
-                        .color(NamedTextColor.GRAY));
+        return comp("no-participants", "prize", prizeName);
     }
 
-    /** Sent privately to the creator when their item is returned. */
-    public static String prizeReturnedToCreator(String prizeName) {
-        return PREFIX + GREEN + "No one entered — your " + YELLOW + prizeName
-                + GREEN + " has been returned to your inventory.";
-    }
+    // ── Private overload for pre-built components ────────────────────────────
 
-    /** Sent privately to the winner when their inventory was full and the item dropped. */
-    public static String inventoryFullItemDropped(String itemName) {
-        return PREFIX + YELLOW + "Your inventory was full! Your prize ("
-                + itemName + ") has been dropped at your feet.";
+    /** Centers a pre-built component by prepending a space-padding component. */
+    private static Component centered(String rawText, Component prebuilt) {
+        String plain = rawText.replaceAll("§[0-9a-fk-orA-FK-OR]|&[0-9a-fk-orA-FK-OR]", "");
+        int padding = Math.max(0, (320 - plain.length() * 6) / 2) / 4;
+        return Component.text(" ".repeat(padding)).append(prebuilt);
     }
 }

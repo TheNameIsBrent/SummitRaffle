@@ -1,5 +1,63 @@
-# SummitRaffle Configuration
+# ──────────────────────────────────────────────
+#   SummitRaffle Configuration
+# ──────────────────────────────────────────────
 
-# Prefix shown at the start of all plugin messages.
-# Supports legacy colour codes with & (e.g. &6 = gold, &r = reset).
+# Prefix for all per-player messages. Supports & colour codes.
 prefix: "&6[SummitRaffle]&r"
+
+# ── Cooldowns ──────────────────────────────────
+# How long (in seconds) a player must wait before starting another raffle.
+# Multiple tiers can be defined below. A player gets the LOWEST cooldown
+# they qualify for via permissions.
+# Permission node format:  raffle.<tier>
+cooldowns:
+  default: 300   # raffle.default or no specific tier — 5 minutes
+  vip:     180   # raffle.vip — 3 minutes
+  mvp:     60    # raffle.mvp — 1 minute
+
+# ── Messages ───────────────────────────────────
+# All player-facing strings. Supports & colour codes.
+# Placeholders: {prefix}, {prize}, {player}, {seconds}, {count}, {item}
+messages:
+  # Per-player feedback
+  usage:                "&7Usage: /raffle <start|join>"
+  no-permission:        "&cYou don't have permission to do that."
+  players-only:         "&cOnly players can use this command."
+  raffle-already-active: "&cA raffle is already running!"
+  must-hold-item:       "&cHold the item you want to raffle in your main hand."
+  join-success:         "&aYou have entered the raffle. Good luck!"
+  already-joined:       "&eYou have already entered this raffle."
+  creator-cannot-join:  "&cYou cannot join your own raffle."
+  no-active-raffle:     "&cThere is no active raffle right now."
+  on-cooldown:          "&cYou must wait &e{seconds}s &cbefore starting another raffle."
+  prize-returned:       "&aNo one entered — your &e{prize} &ahas been returned to your inventory."
+  inventory-full-drop:  "&eYour inventory was full! Your prize has been dropped at your feet."
+  pending-prize-received: "&aWelcome back! You have a pending prize: &e{prize}&a."
+  pending-prize-full:   "&eYour inventory was full — your pending prize &e{prize} &ehas been dropped at your feet."
+
+  # Broadcast — announcement panel
+  announce-separator:   "&6══════════════════════════════════"
+  announce-header:      "&e&l        ✦ RAFFLE STARTED ✦"
+  announce-prize:       "&7  Prize:      &b&l{prize}"
+  announce-started-by:  "&7  Started by: &f&l{player}"
+  announce-join-button: "&a&l       [ Click here to join! ]"
+  announce-join-hover:  "&eClick to join the raffle!"
+  announce-warning:     "&c  ⚠ Make sure you have a free inventory slot to receive your prize!"
+
+  # Broadcast — countdown
+  countdown:            "&6[Raffle] &r{seconds}s &7remaining for &b{prize} &7— &aClick to join!"
+  countdown-hover:      "&eClick to join the raffle!"
+
+  # Broadcast — resolution
+  entries-closed:       "&6[Raffle] &7Entries closed for &b{prize} &7— &e{count} participant(s)."
+  drawing:              "&6[Raffle] &eDrawing a winner&7..."
+
+  # Broadcast — winner panel
+  winner-separator:     "&6  ══════════════════════════════════"
+  winner-header:        "&6&l        ✦ RAFFLE WINNER ✦"
+  winner-name:          "&7  Winner: &e&l{player}"
+  winner-prize:         "&7  Prize:  &b&l{prize}"
+  winner-congrats:      "&a  Congratulations!"
+
+  # Broadcast — no participants
+  no-participants:      "&6[Raffle] &7The raffle for &b{prize} &7ended with no participants. Item returned to the host."

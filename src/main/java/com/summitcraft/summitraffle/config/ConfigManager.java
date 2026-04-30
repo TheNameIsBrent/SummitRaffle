@@ -1,39 +1,75 @@
 package com.summitcraft.summitraffle.config;
 
 import org.bukkit.ChatColor;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Loads and exposes typed values from config.yml.
- *
- * <p>Call {@link #reload()} to re-read the file at runtime (e.g. from a
- * future /raffle reload command) without restarting the server.</p>
+ * Call {@link #reload()} to re-read at runtime.
  */
 public class ConfigManager {
 
     private final JavaPlugin plugin;
 
     private String prefix;
+    private Map<String, Integer> cooldownTiers; // permission suffix → seconds
+    private Map<String, String> rawMessages;    // config key → translated string
 
     public ConfigManager(JavaPlugin plugin) {
         this.plugin = plugin;
         reload();
     }
 
-    /**
-     * Re-reads config.yml from disk, applying defaults for any missing keys.
-     * Safe to call multiple times.
-     */
     public void reload() {
         plugin.saveDefaultConfig();
         plugin.reloadConfig();
 
-        prefix = ChatColor.translateAlternateColorCodes('&',
-                plugin.getConfig().getString("prefix", "&6[SummitRaffle]&r"));
+        prefix = color(plugin.getConfig().getString("prefix", "&6[SummitRaffle]&r"));
+
+        // Load cooldown tiers
+        cooldownTiers = new LinkedHashMap<>();
+        ConfigurationSection cd = plugin.getConfig().getConfigurationSection("cooldowns");
+        if (cd != null) {
+            for (String key : cd.getKeys(false)) {
+                cooldownTiers.put(key, cd.getInt(key, 300));
+            }
+        }
+        if (!cooldownTiers.containsKey("default")) {
+            cooldownTiers.put("default", 300);
+        }
+
+        // Load all messages
+        rawMessages = new LinkedHashMap<>();
+        ConfigurationSection msgs = plugin.getConfig().getConfigurationSection("messages");
+        if (msgs != null) {
+            for (String key : msgs.getKeys(false)) {
+                rawMessages.put(key, color(msgs.getString(key, "")));
+            }
+        }
     }
 
-    /** Returns the translated chat prefix (§-codes already applied). */
-    public String getPrefix() {
-        return prefix;
+    /** Returns the translated prefix (§-codes applied). */
+    public String getPrefix() { return prefix; }
+
+    /**
+     * Returns a translated message string, with {prefix} replaced.
+     * Returns a fallback if the key is missing.
+     */
+    public String getMessage(String key) {
+        String raw = rawMessages.getOrDefault(key, "&c[Missing message: " + key + "]");
+        return raw.replace("{prefix}", prefix);
+    }
+
+    /** Returns the full cooldown tier map (permission suffix → seconds). */
+    public Map<String, Integer> getCooldownTiers() {
+        return cooldownTiers;
+    }
+
+    private static String color(String s) {
+        return s == null ? "" : ChatColor.translateAlternateColorCodes('&', s);
     }
 }
