@@ -66,7 +66,12 @@ public class WinnerResolver {
         UUID winnerUUID = pickRandom(pool);
         Player winner   = Bukkit.getPlayer(winnerUUID);
         boolean online  = winner != null && winner.isOnline();
-        String name     = online ? winner.getName() : winnerUUID.toString();
+
+        // getOfflinePlayer() returns cached last-known name even when offline.
+        // Falls back to UUID string only if the player has truly never joined.
+        String name = online
+                ? winner.getName()
+                : resolveOfflineName(winnerUUID);
 
         logManager.logRaffleEnd(raffle.getPrizeName(), name, winnerUUID,
                 raffle.getParticipants(), online);
@@ -76,10 +81,19 @@ public class WinnerResolver {
             logger.info("Raffle winner: " + winner.getName() + " — prize: " + raffle.getPrizeName());
             deliverOrQueue(winnerUUID, raffle.getPrizeItem(), raffle.getPrizeName(), false);
         } else {
-            logger.warning("Winner " + winnerUUID + " is offline — prize queued.");
+            logger.warning("Winner " + name + " (" + winnerUUID + ") is offline — prize queued.");
             pendingPrizeManager.queuePrize(winnerUUID, raffle.getPrizeItem());
-            Bukkit.broadcast(Messages.raffleWinner(winnerUUID.toString(), raffle.getPrizeName()));
+            Bukkit.broadcast(Messages.raffleWinner(name, raffle.getPrizeName()));
         }
+    }
+
+    /**
+     * Resolves a player name for a UUID that may be offline.
+     * Paper's OfflinePlayer caches the last known name from previous sessions.
+     */
+    private String resolveOfflineName(UUID uuid) {
+        String cached = Bukkit.getOfflinePlayer(uuid).getName();
+        return cached != null ? cached : uuid.toString();
     }
 
     // ── Delivery ──────────────────────────────────────────────────────────────
