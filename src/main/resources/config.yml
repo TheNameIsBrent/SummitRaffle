@@ -24,20 +24,21 @@ cooldowns:
 messages:
 
   # ── Per-player feedback ──────────────────────
-  usage:                 "{prefix} &7Usage: /raffle <start|join>"
+  usage:                 "{prefix} &7Usage: /raffle <start|join|stop>"
   no-permission:         "{prefix} &cYou don't have permission to do that."
-  players-only:          "{prefix} &cOnly players can use this command."
-  raffle-already-active: "{prefix} &cA raffle is already running!"
-  must-hold-item:        "{prefix} &cHold the item you want to raffle in your main hand."
-  join-success:          "{prefix} &aYou have entered the raffle. Good luck!"
-  already-joined:        "{prefix} &eYou have already entered this raffle."
-  creator-cannot-join:   "{prefix} &cYou cannot join your own raffle."
-  no-active-raffle:      "{prefix} &cThere is no active raffle right now."
+  players-only:          "{prefix} &cThis command can only be used by players."
+  raffle-already-active: "{prefix} &cA raffle is already in progress!"
+  must-hold-item:        "{prefix} &cYou must be holding an item to start a raffle."
+  join-success:          "{prefix} &aYou've entered the raffle — good luck!"
+  already-joined:        "{prefix} &eYou've already entered this raffle."
+  creator-cannot-join:   "{prefix} &cYou can't enter your own raffle."
+  no-active-raffle:      "{prefix} &cThere is no active raffle at the moment."
   on-cooldown:           "{prefix} &cYou must wait &e{seconds}s &cbefore starting another raffle."
-  prize-returned:        "{prefix} &aNo one entered — your &e{prize} &ahas been returned to your inventory."
-  inventory-full-drop:   "{prefix} &eYour inventory was full! Your prize has been dropped at your feet."
-  pending-prize-received: "{prefix} &aWelcome back! Your pending prize has been added: &e{prize}&a."
-  pending-prize-full:    "{prefix} &eInventory full — your pending prize &e{prize} &ehas been dropped at your feet."
+  prize-returned:        "{prefix} &aYour &e{prize} &ahas been returned to your inventory."
+  inventory-full-drop:   "{prefix} &eYour inventory is full — your prize was dropped at your feet."
+  pending-prize-received: "{prefix} &aWelcome back! Your pending prize has been delivered: &e{prize}&a."
+  pending-prize-full:    "{prefix} &eInventory full — your pending prize &e{prize} &ewas dropped at your feet."
+  raffle-cancelled:      "{prefix} &cThe raffle was cancelled by &e{player}&c. The prize is being returned."
 
   # ── Announcement panel (broadcast on raffle start) ───
   # These lines are auto-centered in chat.

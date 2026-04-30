@@ -8,12 +8,15 @@ authors: [ SummitCraft ]
 commands:
   raffle:
     description: Main raffle command.
-    usage: /raffle <start|join>
+    usage: /raffle <start|join|stop>
     aliases: [ rf ]
 
 permissions:
   raffle.start:
-    description: Allows starting and stopping raffles.
+    description: Allows starting a raffle (hold item in hand).
+    default: op
+  raffle.stop:
+    description: Allows force-stopping an active raffle (returns item to creator).
     default: op
   raffle.join:
     description: Allows joining an active raffle.

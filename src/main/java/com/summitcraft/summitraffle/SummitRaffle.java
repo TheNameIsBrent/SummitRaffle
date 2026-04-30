@@ -38,8 +38,10 @@ public final class SummitRaffle extends JavaPlugin {
     @Override
     public void onDisable() {
         if (raffleManager != null && raffleManager.isRaffleActive()) {
-            raffleManager.stopRaffle();
-            getLogger().warning("Server shut down with an active raffle — raffle cancelled.");
+            // cancelAndReturn queues the prize to the creator via PendingPrizeManager
+            // so it survives the shutdown and is delivered on next login
+            raffleManager.cancelAndReturn();
+            getLogger().warning("Server stopped with an active raffle — prize queued for creator.");
         }
         getLogger().info("SummitRaffle has been disabled!");
         instance = null;

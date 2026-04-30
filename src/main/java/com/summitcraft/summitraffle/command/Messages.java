@@ -118,6 +118,13 @@ public final class Messages {
     public static String inventoryFullItemDropped(String item) { return msg("inventory-full-drop", "item", item); }
     public static String pendingPrizeReceived(String prize)   { return msg("pending-prize-received", "prize", prize); }
     public static String pendingPrizeFull(String item)        { return msg("pending-prize-full", "prize", item); }
+    public static String raffleCancelled(String prize, String cancellerName) {
+        return msg("raffle-cancelled", "prize", prize, "player", cancellerName);
+    }
+
+    public static Component raffleCancelledComponent(String prize, String cancellerName) {
+        return comp("raffle-cancelled", "prize", prize, "player", cancellerName);
+    }
 
     // ── Adventure broadcasts ──────────────────────────────────────────────────
 
