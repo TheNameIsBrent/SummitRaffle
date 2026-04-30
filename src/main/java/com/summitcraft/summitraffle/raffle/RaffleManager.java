@@ -1,6 +1,9 @@
 package com.summitcraft.summitraffle.raffle;
 
 import com.summitcraft.summitraffle.command.Messages;
+import com.summitcraft.summitraffle.config.ConfigManager;
+import com.summitcraft.summitraffle.logging.LogManager;
+import com.summitcraft.summitraffle.prize.PendingPrizeManager;
 import org.bukkit.Bukkit;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -14,79 +17,56 @@ import java.util.logging.Logger;
 /**
  * Manages the lifecycle of raffles on the server.
  * Enforces the rule that only ONE raffle may be active at any time.
- *
- * <p>Owns the Bukkit countdown task — cancels it cleanly on {@link #stopRaffle()}
- * or server shutdown so no orphaned tasks linger.</p>
- *
- * <p>All server-wide broadcasts use the Adventure API ({@code Bukkit.broadcast(Component)})
- * so click/hover events are preserved. Per-player feedback in commands uses legacy
- * §-codes for simplicity.</p>
  */
 public class RaffleManager {
 
     private final JavaPlugin plugin;
+    private final ConfigManager configManager;
+    private final LogManager logManager;
     private final Logger logger;
     private final WinnerResolver winnerResolver;
 
     private Raffle activeRaffle;
+    private String activeStarterName; // stored so we can log it on end
     private int countdownTaskId = -1;
 
-    public RaffleManager(JavaPlugin plugin, com.summitcraft.summitraffle.prize.PendingPrizeManager pendingPrizeManager) {
-        this.plugin = plugin;
-        this.logger = plugin.getLogger();
-        this.winnerResolver = new WinnerResolver(logger, pendingPrizeManager);
+    public RaffleManager(JavaPlugin plugin, ConfigManager configManager,
+                         LogManager logManager, PendingPrizeManager pendingPrizeManager) {
+        this.plugin         = plugin;
+        this.configManager  = configManager;
+        this.logManager     = logManager;
+        this.logger         = plugin.getLogger();
+        this.winnerResolver = new WinnerResolver(logger, logManager, pendingPrizeManager);
     }
 
-    // -------------------------------------------------------------------------
-    // Lifecycle
-    // -------------------------------------------------------------------------
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    /**
-     * Starts a new raffle with the given item as the prize.
-     * Schedules a 30-second countdown that ends the raffle automatically.
-     *
-     * @param prizeItem   the item to raffle off (taken from the starter's hand by the caller)
-     * @param creatorUUID UUID of the player who started the raffle
-     * @return the new {@link Raffle}, or empty if one is already active
-     */
     public Optional<Raffle> startRaffle(ItemStack prizeItem, UUID creatorUUID, String starterName) {
-        if (activeRaffle != null) {
-            return Optional.empty();
-        }
+        if (activeRaffle != null) return Optional.empty();
 
-        activeRaffle = new Raffle(prizeItem, creatorUUID);
-        logger.info(String.format("Raffle started by %s — prize: %s",
-                starterName, activeRaffle.getPrizeName()));
+        int duration = configManager.getDuration();
+        activeRaffle      = new Raffle(prizeItem, creatorUUID, duration);
+        activeStarterName = starterName;
 
-        // Rich opening broadcast with clickable join button
+        logger.info(String.format("Raffle started by %s — prize: %s | duration: %ds",
+                starterName, activeRaffle.getPrizeName(), duration));
+        logManager.logRaffleStart(starterName, creatorUUID, activeRaffle.getPrizeName(), duration);
+
         Bukkit.broadcast(Messages.raffleStartedComponent(activeRaffle.getPrizeName(), starterName));
-
-        scheduleCountdown();
+        scheduleCountdown(duration);
         return Optional.of(activeRaffle);
     }
 
-    /**
-     * Stops the active raffle immediately (manual cancel or end-of-countdown).
-     *
-     * @return the stopped {@link Raffle}, or empty if none was active
-     */
     public Optional<Raffle> stopRaffle() {
-        if (activeRaffle == null) {
-            return Optional.empty();
-        }
-
+        if (activeRaffle == null) return Optional.empty();
         cancelCountdownTask();
-
         Raffle stopped = activeRaffle;
         activeRaffle = null;
-        logger.info(String.format("Raffle ended — prize: '%s' | participants: %d",
-                stopped.getPrizeName(), stopped.getParticipantCount()));
+        logger.info(String.format("Raffle stopped manually — prize: '%s'", stopped.getPrizeName()));
         return Optional.of(stopped);
     }
 
-    // -------------------------------------------------------------------------
-    // Participation
-    // -------------------------------------------------------------------------
+    // ── Participation ─────────────────────────────────────────────────────────
 
     public JoinResult joinRaffle(UUID playerUUID) {
         if (activeRaffle == null)                              return JoinResult.NO_ACTIVE_RAFFLE;
@@ -96,82 +76,52 @@ public class RaffleManager {
         return JoinResult.SUCCESS;
     }
 
-    // -------------------------------------------------------------------------
-    // Queries
-    // -------------------------------------------------------------------------
+    // ── Queries ───────────────────────────────────────────────────────────────
 
-    public boolean isRaffleActive() {
-        return activeRaffle != null;
-    }
+    public boolean isRaffleActive()                { return activeRaffle != null; }
+    public Optional<Raffle> getActiveRaffle()      { return Optional.ofNullable(activeRaffle); }
+    public Optional<Set<UUID>> getParticipants()   { return getActiveRaffle().map(Raffle::getParticipants); }
 
-    public Optional<Raffle> getActiveRaffle() {
-        return Optional.ofNullable(activeRaffle);
-    }
+    // ── Countdown ─────────────────────────────────────────────────────────────
 
-    public Optional<Set<UUID>> getParticipants() {
-        return getActiveRaffle().map(Raffle::getParticipants);
-    }
-
-    // -------------------------------------------------------------------------
-    // Countdown
-    // -------------------------------------------------------------------------
-
-    private void scheduleCountdown() {
+    private void scheduleCountdown(int durationSeconds) {
         BukkitRunnable task = new BukkitRunnable() {
-
-            int secondsLeft = Raffle.DURATION_SECONDS;
+            int secondsLeft = durationSeconds;
 
             @Override
             public void run() {
-                // Raffle was cancelled externally (e.g. server shutdown)
-                if (activeRaffle == null) {
-                    cancel();
-                    return;
-                }
+                if (activeRaffle == null) { cancel(); return; }
 
                 if (secondsLeft <= 0) {
                     cancel();
                     Raffle finished = activeRaffle;
-                    activeRaffle = null;
+                    activeRaffle    = null;
                     countdownTaskId = -1;
-                    logger.info(String.format("Raffle countdown finished — prize: '%s' | participants: %d",
-                            finished.getPrizeName(), finished.getParticipantCount()));
 
-                    // Broadcast entries closed, then wait 3 seconds before drawing
                     Bukkit.broadcast(Messages.raffleClosedComponent(
                             finished.getPrizeName(), finished.getParticipantCount()));
 
-                    // 1s later: "Drawing winner..."
                     new BukkitRunnable() {
-                        @Override public void run() {
-                            Bukkit.broadcast(Messages.raffleDrawing());
-                        }
+                        @Override public void run() { Bukkit.broadcast(Messages.raffleDrawing()); }
                     }.runTaskLater(plugin, 20L);
 
-                    // 3s later: reveal winner and deliver prize
                     new BukkitRunnable() {
-                        @Override
-                        public void run() {
-                            winnerResolver.resolve(finished);
-                        }
+                        @Override public void run() { winnerResolver.resolve(finished); }
                     }.runTaskLater(plugin, 3 * 20L);
                     return;
                 }
 
-                // Announce at 30s, 20s, 10s, and every second from 5 down to 1
-                if (secondsLeft == Raffle.DURATION_SECONDS
+                // Announce at full duration, 20s, 10s, and every second ≤5
+                if (secondsLeft == durationSeconds
                         || secondsLeft == 20
                         || secondsLeft == 10
                         || secondsLeft <= 5) {
                     Bukkit.broadcast(Messages.raffleCountdownComponent(
                             activeRaffle.getPrizeName(), secondsLeft));
                 }
-
                 secondsLeft--;
             }
         };
-
-        // Run every 20 ticks (1 second), starting immediately
         countdownTaskId = task.runTaskTimer(plugin, 0L, 20L).getTaskId();
     }
 
@@ -182,14 +132,7 @@ public class RaffleManager {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Inner types
-    // -------------------------------------------------------------------------
+    // ── Inner types ───────────────────────────────────────────────────────────
 
-    public enum JoinResult {
-        SUCCESS,
-        NO_ACTIVE_RAFFLE,
-        ALREADY_JOINED,
-        CREATOR_CANNOT_JOIN
-    }
+    public enum JoinResult { SUCCESS, NO_ACTIVE_RAFFLE, ALREADY_JOINED, CREATOR_CANNOT_JOIN }
 }

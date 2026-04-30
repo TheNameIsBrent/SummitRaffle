@@ -15,14 +15,13 @@ import java.util.UUID;
  */
 public class Raffle {
 
-    public static final int DURATION_SECONDS = 30;
-
     private final ItemStack prizeItem;
     private final UUID creatorUUID;
     private final Instant startTime;
+    private final int durationSeconds;
     private final Set<UUID> participants;
 
-    public Raffle(ItemStack prizeItem, UUID creatorUUID) {
+    public Raffle(ItemStack prizeItem, UUID creatorUUID, int durationSeconds) {
         if (prizeItem == null || prizeItem.getType().isAir()) {
             throw new IllegalArgumentException("Prize item must not be null or air.");
         }
@@ -30,10 +29,11 @@ public class Raffle {
             throw new IllegalArgumentException("Creator UUID must not be null.");
         }
 
-        this.prizeItem = ItemStack.deserializeBytes(prizeItem.serializeAsBytes()); // full NBT-safe deep copy
-        this.creatorUUID = creatorUUID;
-        this.startTime = Instant.now();
-        this.participants = Collections.synchronizedSet(new LinkedHashSet<>());
+        this.prizeItem       = ItemStack.deserializeBytes(prizeItem.serializeAsBytes());
+        this.creatorUUID     = creatorUUID;
+        this.startTime       = Instant.now();
+        this.durationSeconds = durationSeconds;
+        this.participants    = Collections.synchronizedSet(new LinkedHashSet<>());
     }
 
     // -------------------------------------------------------------------------
@@ -98,11 +98,7 @@ public class Raffle {
                 : baseName;
     }
 
-    public UUID getCreatorUUID() {
-        return creatorUUID;
-    }
-
-    public Instant getStartTime() {
-        return startTime;
-    }
+    public UUID getCreatorUUID()     { return creatorUUID; }
+    public Instant getStartTime()    { return startTime; }
+    public int getDurationSeconds()  { return durationSeconds; }
 }

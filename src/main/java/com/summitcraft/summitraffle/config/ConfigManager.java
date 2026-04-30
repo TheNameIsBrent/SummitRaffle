@@ -16,6 +16,7 @@ public class ConfigManager {
     private final JavaPlugin plugin;
 
     private String prefix;
+    private int duration;
     private Map<String, Integer> cooldownTiers; // permission suffix → seconds
     private Map<String, String> rawMessages;    // config key → translated string
 
@@ -42,6 +43,8 @@ public class ConfigManager {
             cooldownTiers.put("default", 300);
         }
 
+        duration = plugin.getConfig().getInt("duration", 30);
+
         // Load all messages
         rawMessages = new LinkedHashMap<>();
         ConfigurationSection msgs = plugin.getConfig().getConfigurationSection("messages");
@@ -54,6 +57,9 @@ public class ConfigManager {
 
     /** Returns the translated prefix (§-codes applied). */
     public String getPrefix() { return prefix; }
+
+    /** Returns the configured raffle duration in seconds. */
+    public int getDuration() { return duration; }
 
     /**
      * Returns a translated message string, with {prefix} replaced.
