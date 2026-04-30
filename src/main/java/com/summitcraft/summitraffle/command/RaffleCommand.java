@@ -1,5 +1,6 @@
 package com.summitcraft.summitraffle.command;
 
+import com.summitcraft.summitraffle.raffle.Raffle;
 import com.summitcraft.summitraffle.raffle.RaffleManager;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -10,6 +11,7 @@ import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Handles all /raffle subcommands.
@@ -41,14 +43,14 @@ public class RaffleCommand implements CommandExecutor, TabCompleter {
             @NotNull String[] args
     ) {
         if (args.length == 0) {
-            sender.sendMessage(Messages.USAGE);
+            sender.sendMessage(Messages.usage());
             return true;
         }
 
         switch (args[0].toLowerCase()) {
             case "start" -> handleStart(sender);
             case "join"  -> handleJoin(sender);
-            default      -> sender.sendMessage(Messages.USAGE);
+            default      -> sender.sendMessage(Messages.usage());
         }
 
         return true;
@@ -60,38 +62,34 @@ public class RaffleCommand implements CommandExecutor, TabCompleter {
 
     private void handleStart(CommandSender sender) {
         if (!sender.hasPermission(PERM_START)) {
-            sender.sendMessage(Messages.NO_PERMISSION);
+            sender.sendMessage(Messages.noPermission());
             return;
         }
 
-        // Must be a player — console cannot hold items
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(Messages.PLAYERS_ONLY);
+            sender.sendMessage(Messages.playersOnly());
             return;
         }
 
-        // Block if a raffle is already running
         if (raffleManager.isRaffleActive()) {
-            player.sendMessage(Messages.RAFFLE_ALREADY_ACTIVE);
+            player.sendMessage(Messages.raffleAlreadyActive());
             return;
         }
 
-        // Player must be holding something
         ItemStack held = player.getInventory().getItemInMainHand();
         if (held.getType().isAir()) {
-            player.sendMessage(Messages.MUST_HOLD_ITEM);
+            player.sendMessage(Messages.mustHoldItem());
             return;
         }
 
-        // Take the entire hand stack as the prize
         ItemStack prize = held.clone();
         player.getInventory().setItemInMainHand(null);
 
-        Optional<Raffle> started = raffleManager.startRaffle(prize, player.getUniqueId());
+        Optional<Raffle> started = raffleManager.startRaffle(prize, player.getUniqueId(), player.getName());
 
         if (started.isEmpty()) {
-            // Race condition safety — another raffle snuck in between the check and start
-            player.sendMessage(Messages.RAFFLE_ALREADY_ACTIVE);
+            // Race condition safety — return the item
+            player.sendMessage(Messages.raffleAlreadyActive());
             player.getInventory().addItem(prize);
         }
         // Broadcast is fired inside RaffleManager.startRaffle() — nothing to do on success
@@ -103,15 +101,15 @@ public class RaffleCommand implements CommandExecutor, TabCompleter {
 
     private void handleJoin(CommandSender sender) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(Messages.PLAYERS_ONLY);
+            sender.sendMessage(Messages.playersOnly());
             return;
         }
 
         switch (raffleManager.joinRaffle(player.getUniqueId())) {
-            case SUCCESS               -> player.sendMessage(Messages.JOIN_SUCCESS);
-            case ALREADY_JOINED        -> player.sendMessage(Messages.ALREADY_JOINED);
-            case NO_ACTIVE_RAFFLE      -> player.sendMessage(Messages.NO_ACTIVE_RAFFLE);
-            case CREATOR_CANNOT_JOIN   -> player.sendMessage(Messages.CREATOR_CANNOT_JOIN);
+            case SUCCESS             -> player.sendMessage(Messages.joinSuccess());
+            case ALREADY_JOINED      -> player.sendMessage(Messages.alreadyJoined());
+            case NO_ACTIVE_RAFFLE    -> player.sendMessage(Messages.noActiveRaffle());
+            case CREATOR_CANNOT_JOIN -> player.sendMessage(Messages.creatorCannotJoin());
         }
     }
 

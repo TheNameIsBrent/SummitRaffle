@@ -47,17 +47,17 @@ public class RaffleManager {
      * @param creatorUUID UUID of the player who started the raffle
      * @return the new {@link Raffle}, or empty if one is already active
      */
-    public Optional<Raffle> startRaffle(ItemStack prizeItem, UUID creatorUUID) {
+    public Optional<Raffle> startRaffle(ItemStack prizeItem, UUID creatorUUID, String starterName) {
         if (activeRaffle != null) {
             return Optional.empty();
         }
 
         activeRaffle = new Raffle(prizeItem, creatorUUID);
         logger.info(String.format("Raffle started by %s — prize: %s",
-                creatorUUID, activeRaffle.getPrizeName()));
+                starterName, activeRaffle.getPrizeName()));
 
         // Rich opening broadcast with clickable join button
-        Bukkit.broadcast(Messages.raffleStartedComponent(activeRaffle.getPrizeName()));
+        Bukkit.broadcast(Messages.raffleStartedComponent(activeRaffle.getPrizeName(), starterName));
 
         scheduleCountdown();
         return Optional.of(activeRaffle);

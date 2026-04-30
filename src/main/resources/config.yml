@@ -1,0 +1,5 @@
+# SummitRaffle Configuration
+
+# Prefix shown at the start of all plugin messages.
+# Supports legacy colour codes with & (e.g. &6 = gold, &r = reset).
+prefix: "&6[SummitRaffle]&r"

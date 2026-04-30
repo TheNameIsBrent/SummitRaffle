@@ -9,68 +9,61 @@ import net.kyori.adventure.text.format.TextDecoration;
 /**
  * Central store for all player-facing messages.
  *
- * <p>Simple feedback strings use legacy §-codes for brevity.
- * Rich broadcasts (start announcement, countdown, close) use the
- * Adventure API so they can carry click/hover events.</p>
+ * <p>The prefix is injected at startup (and on reload) from config.yml via
+ * {@link #setPrefix(String)}. Per-player feedback uses legacy §-codes for
+ * simplicity. Rich server-wide broadcasts use the Adventure API.</p>
  */
 public final class Messages {
 
     private Messages() {}
 
-    // ── Legacy §-code constants (simple per-player feedback) ─────────────────
+    // Injected from config.yml on enable
+    private static String PREFIX = "§6[SummitRaffle] §r";
 
-    private static final String PREFIX = "§6[SummitRaffle] §r";
+    /** Called by the main plugin class after loading config.yml. */
+    public static void setPrefix(String prefix) {
+        PREFIX = prefix.endsWith(" ") ? prefix : prefix + " ";
+    }
+
+    // ── Colour shorthands ─────────────────────────────────────────────────────
+
     private static final String RED    = "§c";
     private static final String GREEN  = "§a";
     private static final String YELLOW = "§e";
     private static final String GRAY   = "§7";
 
-    public static final String USAGE =
-            PREFIX + GRAY + "Usage: /raffle <start|join>";
+    // ── Per-player feedback ───────────────────────────────────────────────────
 
-    public static final String NO_PERMISSION =
-            PREFIX + RED + "You don't have permission to do that.";
-
-    public static final String PLAYERS_ONLY =
-            PREFIX + RED + "Only players can use this command.";
-
-    public static final String RAFFLE_ALREADY_ACTIVE =
-            PREFIX + RED + "A raffle is already running!";
-
-    public static final String MUST_HOLD_ITEM =
-            PREFIX + RED + "Hold the item you want to raffle in your main hand.";
-
-    public static final String JOIN_SUCCESS =
-            PREFIX + GREEN + "You have entered the raffle. Good luck!";
-
-    public static final String ALREADY_JOINED =
-            PREFIX + YELLOW + "You have already entered this raffle.";
-
-    public static final String CREATOR_CANNOT_JOIN =
-            PREFIX + RED + "You cannot join your own raffle.";
-
-    public static final String NO_ACTIVE_RAFFLE =
-            PREFIX + RED + "There is no active raffle right now.";
+    public static String usage()               { return PREFIX + GRAY   + "Usage: /raffle <start|join>"; }
+    public static String noPermission()        { return PREFIX + RED    + "You don't have permission to do that."; }
+    public static String playersOnly()         { return PREFIX + RED    + "Only players can use this command."; }
+    public static String raffleAlreadyActive() { return PREFIX + RED    + "A raffle is already running!"; }
+    public static String mustHoldItem()        { return PREFIX + RED    + "Hold the item you want to raffle in your main hand."; }
+    public static String joinSuccess()         { return PREFIX + GREEN  + "You have entered the raffle. Good luck!"; }
+    public static String alreadyJoined()       { return PREFIX + YELLOW + "You have already entered this raffle."; }
+    public static String creatorCannotJoin()   { return PREFIX + RED    + "You cannot join your own raffle."; }
+    public static String noActiveRaffle()      { return PREFIX + RED    + "There is no active raffle right now."; }
 
     // ── Adventure Components (rich server-wide broadcasts) ───────────────────
 
     /**
-     * Large opening announcement with a clickable join button.
+     * Large opening announcement with prize, starter name, and a clickable join button.
      *
      * <pre>
      * ══════════════════════════════════
      *        ✦ RAFFLE STARTED ✦
-     *   Prize: 64x Diamond
+     *   Prize:      64x Diamond
+     *   Started by: Steve
      *
-     *   [ Click here to join! ]       ← runs /raffle join, hover text
+     *       [ Click here to join! ]
      *
      *   ⚠ Make sure you have a free
      *     inventory slot to receive
-     *     your prize!
+     *     your prize if you win!
      * ══════════════════════════════════
      * </pre>
      */
-    public static Component raffleStartedComponent(String prizeName) {
+    public static Component raffleStartedComponent(String prizeName, String starterName) {
         Component separator = Component.text("══════════════════════════════════")
                 .color(NamedTextColor.GOLD);
 
@@ -79,8 +72,13 @@ public final class Messages {
                 .decorate(TextDecoration.BOLD);
 
         Component prizeLabel = Component.empty()
-                .append(Component.text("  Prize: ").color(NamedTextColor.GRAY))
+                .append(Component.text("  Prize:      ").color(NamedTextColor.GRAY))
                 .append(Component.text(prizeName).color(NamedTextColor.AQUA)
+                        .decorate(TextDecoration.BOLD));
+
+        Component starterLabel = Component.empty()
+                .append(Component.text("  Started by: ").color(NamedTextColor.GRAY))
+                .append(Component.text(starterName).color(NamedTextColor.WHITE)
                         .decorate(TextDecoration.BOLD));
 
         Component joinButton = Component.text("       [ Click here to join! ]")
@@ -105,6 +103,7 @@ public final class Messages {
                 .append(separator).append(Component.newline())
                 .append(header).append(Component.newline())
                 .append(prizeLabel).append(Component.newline())
+                .append(starterLabel).append(Component.newline())
                 .append(Component.newline())
                 .append(joinButton).append(Component.newline())
                 .append(Component.newline())
@@ -115,9 +114,7 @@ public final class Messages {
 
     /** Countdown reminder — broadcast at 30s, 20s, 10s, 5-1s. */
     public static Component raffleCountdownComponent(String prizeName, int secondsLeft) {
-        NamedTextColor timeColor = secondsLeft <= 5
-                ? NamedTextColor.RED
-                : NamedTextColor.YELLOW;
+        NamedTextColor timeColor = secondsLeft <= 5 ? NamedTextColor.RED : NamedTextColor.YELLOW;
 
         return Component.empty()
                 .append(Component.text("[Raffle] ").color(NamedTextColor.GOLD))
@@ -134,7 +131,7 @@ public final class Messages {
                                         .color(NamedTextColor.YELLOW))));
     }
 
-    /** Broadcast when the raffle entry window closes and a winner is about to be drawn. */
+    /** Broadcast when the entry window closes and a winner is about to be drawn. */
     public static Component raffleClosedComponent(String prizeName, int participantCount) {
         return Component.empty()
                 .append(Component.text("[Raffle] ").color(NamedTextColor.GOLD))
