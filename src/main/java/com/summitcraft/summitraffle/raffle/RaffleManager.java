@@ -1,5 +1,11 @@
 package com.summitcraft.summitraffle.raffle;
 
+import com.summitcraft.summitraffle.command.Messages;
+import org.bukkit.Bukkit;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
+
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -9,18 +15,20 @@ import java.util.logging.Logger;
  * Manages the lifecycle of raffles on the server.
  * Enforces the rule that only ONE raffle may be active at any time.
  *
- * <p>This class is the single source of truth for raffle state and is
- * intentionally decoupled from commands, events, and plugin internals
- * so it can be tested and extended independently.</p>
+ * <p>Owns the Bukkit countdown task — cancels it cleanly on {@link #stopRaffle()}
+ * or server shutdown so no orphaned tasks linger.</p>
  */
 public class RaffleManager {
 
+    private final JavaPlugin plugin;
     private final Logger logger;
-    private Raffle activeRaffle;
 
-    public RaffleManager(Logger logger) {
-        this.logger = logger;
-        this.activeRaffle = null;
+    private Raffle activeRaffle;
+    private int countdownTaskId = -1;
+
+    public RaffleManager(JavaPlugin plugin) {
+        this.plugin = plugin;
+        this.logger = plugin.getLogger();
     }
 
     // -------------------------------------------------------------------------
@@ -28,41 +36,42 @@ public class RaffleManager {
     // -------------------------------------------------------------------------
 
     /**
-     * Starts a new raffle if none is currently active.
+     * Starts a new raffle with the given item as the prize.
+     * Schedules a 30-second countdown that ends the raffle automatically.
      *
-     * @param prize       the prize description
-     * @param creatorUUID the UUID of the player or console starting the raffle
-     * @return the newly created {@link Raffle}, or empty if one is already running
+     * @param prizeItem   the item to raffle off (taken from the starter's hand by the caller)
+     * @param creatorUUID UUID of the player who started the raffle
+     * @return the new {@link Raffle}, or empty if one is already active
      */
-    public Optional<Raffle> startRaffle(String prize, UUID creatorUUID) {
+    public Optional<Raffle> startRaffle(ItemStack prizeItem, UUID creatorUUID) {
         if (activeRaffle != null) {
-            logger.warning("Attempted to start a raffle while one is already active.");
             return Optional.empty();
         }
 
-        activeRaffle = new Raffle(prize, creatorUUID);
-        logger.info(String.format("Raffle started by %s for prize: %s", creatorUUID, prize));
+        activeRaffle = new Raffle(prizeItem, creatorUUID);
+        logger.info(String.format("Raffle started by %s — prize: %s",
+                creatorUUID, activeRaffle.getPrizeName()));
+
+        scheduleCountdown();
         return Optional.of(activeRaffle);
     }
 
     /**
-     * Stops the active raffle and returns it for winner resolution.
+     * Stops the active raffle immediately (manual cancel or end-of-countdown).
      *
-     * @return the stopped {@link Raffle}, or empty if no raffle was running
+     * @return the stopped {@link Raffle}, or empty if none was active
      */
     public Optional<Raffle> stopRaffle() {
         if (activeRaffle == null) {
-            logger.warning("Attempted to stop a raffle, but none is active.");
             return Optional.empty();
         }
 
+        cancelCountdownTask();
+
         Raffle stopped = activeRaffle;
         activeRaffle = null;
-        logger.info(String.format(
-                "Raffle stopped. Prize: '%s' | Participants: %d",
-                stopped.getPrize(),
-                stopped.getParticipantCount()
-        ));
+        logger.info(String.format("Raffle ended — prize: '%s' | participants: %d",
+                stopped.getPrizeName(), stopped.getParticipantCount()));
         return Optional.of(stopped);
     }
 
@@ -70,19 +79,9 @@ public class RaffleManager {
     // Participation
     // -------------------------------------------------------------------------
 
-    /**
-     * Attempts to add a player to the active raffle.
-     *
-     * @param playerUUID the UUID of the player joining
-     * @return the result of the join attempt
-     */
     public JoinResult joinRaffle(UUID playerUUID) {
-        if (activeRaffle == null) {
-            return JoinResult.NO_ACTIVE_RAFFLE;
-        }
-        if (activeRaffle.hasParticipant(playerUUID)) {
-            return JoinResult.ALREADY_JOINED;
-        }
+        if (activeRaffle == null)                    return JoinResult.NO_ACTIVE_RAFFLE;
+        if (activeRaffle.hasParticipant(playerUUID)) return JoinResult.ALREADY_JOINED;
         activeRaffle.addParticipant(playerUUID);
         return JoinResult.SUCCESS;
     }
@@ -91,40 +90,79 @@ public class RaffleManager {
     // Queries
     // -------------------------------------------------------------------------
 
-    /**
-     * Returns whether a raffle is currently active.
-     */
     public boolean isRaffleActive() {
         return activeRaffle != null;
     }
 
-    /**
-     * Returns the active raffle, if one exists.
-     */
     public Optional<Raffle> getActiveRaffle() {
         return Optional.ofNullable(activeRaffle);
     }
 
-    /**
-     * Returns an unmodifiable snapshot of current participants, or empty if no raffle is running.
-     */
     public Optional<Set<UUID>> getParticipants() {
         return getActiveRaffle().map(Raffle::getParticipants);
+    }
+
+    // -------------------------------------------------------------------------
+    // Countdown
+    // -------------------------------------------------------------------------
+
+    private void scheduleCountdown() {
+        BukkitRunnable task = new BukkitRunnable() {
+
+            int secondsLeft = Raffle.DURATION_SECONDS;
+
+            @Override
+            public void run() {
+                // Raffle was cancelled externally (e.g. server shutdown)
+                if (activeRaffle == null) {
+                    cancel();
+                    return;
+                }
+
+                // Announce at 30, 20, 10, 5, 4, 3, 2, 1
+                if (secondsLeft == Raffle.DURATION_SECONDS
+                        || secondsLeft == 20
+                        || secondsLeft == 10
+                        || secondsLeft <= 5) {
+                    Bukkit.broadcastMessage(Messages.raffleCountdown(
+                            activeRaffle.getPrizeName(), secondsLeft));
+                }
+
+                if (secondsLeft <= 0) {
+                    cancel();
+                    Raffle finished = activeRaffle;
+                    activeRaffle = null;
+                    countdownTaskId = -1;
+                    logger.info(String.format("Raffle countdown finished — prize: '%s' | participants: %d",
+                            finished.getPrizeName(), finished.getParticipantCount()));
+                    Bukkit.broadcastMessage(Messages.raffleClosed(finished.getPrizeName(),
+                            finished.getParticipantCount()));
+                    // Winner selection will be wired in next iteration
+                    return;
+                }
+
+                secondsLeft--;
+            }
+        };
+
+        // Run every 20 ticks (1 second), starting immediately
+        countdownTaskId = task.runTaskTimer(plugin, 0L, 20L).getTaskId();
+    }
+
+    private void cancelCountdownTask() {
+        if (countdownTaskId != -1) {
+            Bukkit.getScheduler().cancelTask(countdownTaskId);
+            countdownTaskId = -1;
+        }
     }
 
     // -------------------------------------------------------------------------
     // Inner types
     // -------------------------------------------------------------------------
 
-    /**
-     * Represents the outcome of a player attempting to join a raffle.
-     */
     public enum JoinResult {
-        /** Player successfully joined the raffle. */
         SUCCESS,
-        /** No raffle is currently running. */
         NO_ACTIVE_RAFFLE,
-        /** Player has already joined this raffle. */
         ALREADY_JOINED
     }
 }

@@ -12,14 +12,13 @@ public final class SummitRaffle extends JavaPlugin {
     @Override
     public void onEnable() {
         instance = this;
-        raffleManager = new RaffleManager(getLogger());
+        raffleManager = new RaffleManager(this);
         registerCommands();
         getLogger().info("SummitRaffle has been enabled!");
     }
 
     @Override
     public void onDisable() {
-        // If a raffle is running when the server shuts down, stop it cleanly.
         if (raffleManager != null && raffleManager.isRaffleActive()) {
             raffleManager.stopRaffle();
             getLogger().warning("Server shut down with an active raffle — raffle cancelled.");
@@ -35,10 +34,6 @@ public final class SummitRaffle extends JavaPlugin {
     public RaffleManager getRaffleManager() {
         return raffleManager;
     }
-
-    // -------------------------------------------------------------------------
-    // Internal setup
-    // -------------------------------------------------------------------------
 
     private void registerCommands() {
         RaffleCommand raffleCommand = new RaffleCommand(raffleManager);
