@@ -1,6 +1,5 @@
 package com.summitcraft.summitraffle.command;
 
-import com.summitcraft.summitraffle.raffle.Raffle;
 import com.summitcraft.summitraffle.raffle.RaffleManager;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -11,7 +10,6 @@ import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Handles all /raffle subcommands.
@@ -85,27 +83,18 @@ public class RaffleCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        // Take exactly one item from the stack, leave the rest
+        // Take the entire hand stack as the prize
         ItemStack prize = held.clone();
-        prize.setAmount(1);
-
-        if (held.getAmount() > 1) {
-            held.setAmount(held.getAmount() - 1);
-        } else {
-            player.getInventory().setItemInMainHand(null);
-        }
+        player.getInventory().setItemInMainHand(null);
 
         Optional<Raffle> started = raffleManager.startRaffle(prize, player.getUniqueId());
 
-        if (started.isPresent()) {
-            sender.getServer().broadcastMessage(
-                    Messages.raffleStarted(started.get().getPrizeName()));
-        } else {
+        if (started.isEmpty()) {
             // Race condition safety — another raffle snuck in between the check and start
             player.sendMessage(Messages.RAFFLE_ALREADY_ACTIVE);
-            // Return the item since we didn't use it
             player.getInventory().addItem(prize);
         }
+        // Broadcast is fired inside RaffleManager.startRaffle() — nothing to do on success
     }
 
     // -------------------------------------------------------------------------
@@ -119,9 +108,10 @@ public class RaffleCommand implements CommandExecutor, TabCompleter {
         }
 
         switch (raffleManager.joinRaffle(player.getUniqueId())) {
-            case SUCCESS          -> player.sendMessage(Messages.JOIN_SUCCESS);
-            case ALREADY_JOINED   -> player.sendMessage(Messages.ALREADY_JOINED);
-            case NO_ACTIVE_RAFFLE -> player.sendMessage(Messages.NO_ACTIVE_RAFFLE);
+            case SUCCESS               -> player.sendMessage(Messages.JOIN_SUCCESS);
+            case ALREADY_JOINED        -> player.sendMessage(Messages.ALREADY_JOINED);
+            case NO_ACTIVE_RAFFLE      -> player.sendMessage(Messages.NO_ACTIVE_RAFFLE);
+            case CREATOR_CANNOT_JOIN   -> player.sendMessage(Messages.CREATOR_CANNOT_JOIN);
         }
     }
 

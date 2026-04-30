@@ -10,8 +10,8 @@ import java.util.UUID;
 
 /**
  * Represents a single active raffle session.
- * Immutable metadata (prizeItem, creator, startTime, durationSeconds) is set at construction.
- * Participants are managed via thread-safe methods.
+ * Immutable metadata (prizeItem, creator, startTime) is set at construction.
+ * The full hand stack is stored as the prize — quantity included.
  */
 public class Raffle {
 
@@ -30,7 +30,7 @@ public class Raffle {
             throw new IllegalArgumentException("Creator UUID must not be null.");
         }
 
-        this.prizeItem = prizeItem.clone(); // defensive copy — caller may modify their stack
+        this.prizeItem = prizeItem.clone(); // full stack, quantity preserved
         this.creatorUUID = creatorUUID;
         this.startTime = Instant.now();
         this.participants = Collections.synchronizedSet(new LinkedHashSet<>());
@@ -74,20 +74,28 @@ public class Raffle {
         return prizeItem.clone();
     }
 
-    /** Human-readable prize name for messages (custom name → material name fallback). */
+    /**
+     * Human-readable prize name for broadcasts.
+     * Prefixes quantity when the stack has more than one, e.g. "64x Diamond".
+     * Uses custom display name if present, otherwise formats the material name.
+     */
     public String getPrizeName() {
+        String baseName;
         if (prizeItem.hasItemMeta() && prizeItem.getItemMeta().hasDisplayName()) {
-            return prizeItem.getItemMeta().getDisplayName();
+            baseName = prizeItem.getItemMeta().getDisplayName();
+        } else {
+            String raw = prizeItem.getType().name().replace('_', ' ');
+            StringBuilder sb = new StringBuilder();
+            for (String word : raw.split(" ")) {
+                if (!sb.isEmpty()) sb.append(' ');
+                sb.append(Character.toUpperCase(word.charAt(0)))
+                  .append(word.substring(1).toLowerCase());
+            }
+            baseName = sb.toString();
         }
-        // e.g. DIAMOND_SWORD → "Diamond Sword"
-        String raw = prizeItem.getType().name().replace('_', ' ');
-        StringBuilder sb = new StringBuilder();
-        for (String word : raw.split(" ")) {
-            if (!sb.isEmpty()) sb.append(' ');
-            sb.append(Character.toUpperCase(word.charAt(0)))
-              .append(word.substring(1).toLowerCase());
-        }
-        return sb.toString();
+        return prizeItem.getAmount() > 1
+                ? prizeItem.getAmount() + "x " + baseName
+                : baseName;
     }
 
     public UUID getCreatorUUID() {

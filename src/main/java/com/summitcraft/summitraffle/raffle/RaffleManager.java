@@ -17,6 +17,10 @@ import java.util.logging.Logger;
  *
  * <p>Owns the Bukkit countdown task — cancels it cleanly on {@link #stopRaffle()}
  * or server shutdown so no orphaned tasks linger.</p>
+ *
+ * <p>All server-wide broadcasts use the Adventure API ({@code Bukkit.broadcast(Component)})
+ * so click/hover events are preserved. Per-player feedback in commands uses legacy
+ * §-codes for simplicity.</p>
  */
 public class RaffleManager {
 
@@ -52,6 +56,9 @@ public class RaffleManager {
         logger.info(String.format("Raffle started by %s — prize: %s",
                 creatorUUID, activeRaffle.getPrizeName()));
 
+        // Rich opening broadcast with clickable join button
+        Bukkit.broadcast(Messages.raffleStartedComponent(activeRaffle.getPrizeName()));
+
         scheduleCountdown();
         return Optional.of(activeRaffle);
     }
@@ -80,8 +87,9 @@ public class RaffleManager {
     // -------------------------------------------------------------------------
 
     public JoinResult joinRaffle(UUID playerUUID) {
-        if (activeRaffle == null)                    return JoinResult.NO_ACTIVE_RAFFLE;
-        if (activeRaffle.hasParticipant(playerUUID)) return JoinResult.ALREADY_JOINED;
+        if (activeRaffle == null)                              return JoinResult.NO_ACTIVE_RAFFLE;
+        if (activeRaffle.getCreatorUUID().equals(playerUUID)) return JoinResult.CREATOR_CANNOT_JOIN;
+        if (activeRaffle.hasParticipant(playerUUID))          return JoinResult.ALREADY_JOINED;
         activeRaffle.addParticipant(playerUUID);
         return JoinResult.SUCCESS;
     }
@@ -119,15 +127,6 @@ public class RaffleManager {
                     return;
                 }
 
-                // Announce at 30, 20, 10, 5, 4, 3, 2, 1
-                if (secondsLeft == Raffle.DURATION_SECONDS
-                        || secondsLeft == 20
-                        || secondsLeft == 10
-                        || secondsLeft <= 5) {
-                    Bukkit.broadcastMessage(Messages.raffleCountdown(
-                            activeRaffle.getPrizeName(), secondsLeft));
-                }
-
                 if (secondsLeft <= 0) {
                     cancel();
                     Raffle finished = activeRaffle;
@@ -135,10 +134,19 @@ public class RaffleManager {
                     countdownTaskId = -1;
                     logger.info(String.format("Raffle countdown finished — prize: '%s' | participants: %d",
                             finished.getPrizeName(), finished.getParticipantCount()));
-                    Bukkit.broadcastMessage(Messages.raffleClosed(finished.getPrizeName(),
-                            finished.getParticipantCount()));
+                    Bukkit.broadcast(Messages.raffleClosedComponent(
+                            finished.getPrizeName(), finished.getParticipantCount()));
                     // Winner selection will be wired in next iteration
                     return;
+                }
+
+                // Announce at 30s, 20s, 10s, and every second from 5 down to 1
+                if (secondsLeft == Raffle.DURATION_SECONDS
+                        || secondsLeft == 20
+                        || secondsLeft == 10
+                        || secondsLeft <= 5) {
+                    Bukkit.broadcast(Messages.raffleCountdownComponent(
+                            activeRaffle.getPrizeName(), secondsLeft));
                 }
 
                 secondsLeft--;
@@ -163,6 +171,7 @@ public class RaffleManager {
     public enum JoinResult {
         SUCCESS,
         NO_ACTIVE_RAFFLE,
-        ALREADY_JOINED
+        ALREADY_JOINED,
+        CREATOR_CANNOT_JOIN
     }
 }
