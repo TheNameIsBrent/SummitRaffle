@@ -57,11 +57,11 @@ public final class ColorParser {
     public static Component parse(String input) {
         if (input == null || input.isEmpty()) return Component.empty();
 
-        // Handle <center> wrapper — strip the tag and pad the inner content
+        // Handle <center> wrapper — pass raw inner string for accurate width measurement
         Matcher cm = CENTER.matcher(input);
         if (cm.matches()) {
             String inner = cm.group(1);
-            return centerComponent(parseInner(inner));
+            return centerComponent(parseInner(inner), inner);
         }
 
         return parseInner(input);
@@ -70,13 +70,27 @@ public final class ColorParser {
     /**
      * Measures the pixel width of the plain-text content of a Component
      * and prepends enough space characters to center it in {@link #CHAT_WIDTH_PX}.
+     *
+     * @param content   the already-parsed Component to center
+     * @param rawSource the original raw config string (before parsing) used for
+     *                  accurate width measurement — bold/format state is preserved
+     */
+    public static Component centerComponent(Component content, String rawSource) {
+        int textPx = measureRaw(rawSource);
+        int spaces = Math.max(0, (CHAT_WIDTH_PX - textPx) / 2 / 4);
+        return Component.text(" ".repeat(spaces)).append(content);
+    }
+
+    /**
+     * Convenience overload that measures via plain-text extraction from the Component.
+     * Less accurate for bold text — prefer {@link #centerComponent(Component, String)}
+     * when the raw source string is available.
      */
     public static Component centerComponent(Component content) {
-        // Extract plain text to measure width
         String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
                 .plainText().serialize(content);
-        int textPx  = measureWidth(plain);
-        int spaces  = Math.max(0, (CHAT_WIDTH_PX - textPx) / 2 / 4);
+        int textPx = measureWidth(plain, false);
+        int spaces = Math.max(0, (CHAT_WIDTH_PX - textPx) / 2 / 4);
         return Component.text(" ".repeat(spaces)).append(content);
     }
 
@@ -115,10 +129,46 @@ public final class ColorParser {
         };
     }
 
-    private static int measureWidth(String plain) {
+    /** Measure pixel width of a plain string with no bold tracking. */
+    private static int measureWidth(String plain, boolean bold) {
         int w = 0;
-        for (char c : plain.toCharArray()) w += charWidth(c) + 1;
+        for (char c : plain.toCharArray()) {
+            int cw = charWidth(c);
+            if (bold) cw++;        // bold adds 1px per glyph
+            w += cw + 1;           // +1 inter-character shadow pixel
+        }
         return w;
+    }
+
+    /**
+     * Measure pixel width of a raw config string, tracking {@code &l}/{@code &r}
+     * bold state and stripping all other codes and tags.
+     * This is the accurate method — use it whenever the raw source is available.
+     */
+    private static int measureRaw(String raw) {
+        // Strip gradient tags and hex tags — we only care about visible characters
+        String s = raw
+                .replaceAll("(?i)<gradient:[^>]*>", "")
+                .replaceAll("(?i)</gradient>", "")
+                .replaceAll("(?i)&#[0-9A-Fa-f]{6}", "");
+
+        int width = 0;
+        boolean bold = false;
+
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '&' && i + 1 < s.length()) {
+                char code = Character.toLowerCase(s.charAt(i + 1));
+                if (code == 'l') { bold = true;  i++; continue; }
+                if (code == 'r') { bold = false; i++; continue; }
+                // Any other & code — skip it, it's not visible
+                if ("0123456789abcdefkmno".indexOf(code) >= 0) { i++; continue; }
+            }
+            int cw = charWidth(c);
+            if (bold) cw++;
+            width += cw + 1;
+        }
+        return width;
     }
 
     /**

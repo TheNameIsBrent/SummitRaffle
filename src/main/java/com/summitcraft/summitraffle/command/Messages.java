@@ -76,8 +76,9 @@ public final class Messages {
 
         // Join button needs special handling: parse the raw text for centering,
         // then re-apply click/hover on the centered result
-        Component centeredButton = ColorParser.centerComponent(ColorParser.parse(
-                buttonRaw.replaceAll("(?i)^\\s*<center>|</center>\\s*$", "")))
+        Component centeredButton = ColorParser.centerComponent(
+                ColorParser.parse(buttonRaw.replaceAll("(?i)^\\s*<center>|</center>\\s*$", "")),
+                buttonRaw.replaceAll("(?i)^\\s*<center>|</center>\\s*$", ""))
                 .clickEvent(ClickEvent.runCommand("/raffle join"))
                 .hoverEvent(HoverEvent.showText(ColorParser.parse(hoverRaw)));
 
