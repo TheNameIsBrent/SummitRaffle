@@ -1,27 +1,46 @@
-# ──────────────────────────────────────────────
-#   SummitRaffle Configuration
-# ──────────────────────────────────────────────
+# ════════════════════════════════════════════════
+#   SummitRaffle  —  config.yml
+# ════════════════════════════════════════════════
+#
+# COLOUR CODE GUIDE
+# ─────────────────
+# Standard codes    &6 &a &c &l &r etc. (the usual & codes)
+#
+# Hex colour        &#RRGGBB
+#   Example:  &#FF5733Hello  →  renders "Hello" in #FF5733
+#
+# Gradient          <gradient:#HEX1:#HEX2>text</gradient>
+#   Fades each character from HEX1 to HEX2 across the text.
+#   Example:  <gradient:#FF0000:#0000FF>Rainbow</gradient>
+#
+#   Multiple stops are supported (add as many as you like):
+#   <gradient:#FF0000:#FFFF00:#00FF00>Red → Yellow → Green</gradient>
+#
+#   You can also combine with formatting codes inside the gradient:
+#   <gradient:#FFD700:#FFA500>&lGolden Bold Text</gradient>
+#
+# All three syntaxes can be mixed freely in the same line.
+# ════════════════════════════════════════════════
 
 # Prefix shown wherever {prefix} appears in a message below.
-# Supports & colour codes.
-prefix: "&6[SummitRaffle]&r"
+prefix: "<gradient:#FFD700:#FFA500>[SummitRaffle]</gradient>&r"
 
-# How long (seconds) the raffle runs before entries close.
+# How long (seconds) the raffle entry window stays open.
 duration: 30
 
 # ── Cooldowns ──────────────────────────────────
 # Seconds a player must wait before starting another raffle.
-# A player receives the LOWEST cooldown they qualify for.
-# Permission node format: raffle.cooldown.<tier>
-# Add as many tiers as you like — just give players the matching permission.
+# A player always receives the LOWEST cooldown they qualify for.
+# Permission node format:  raffle.cooldown.<tier>
+# Add as many tiers as you like.
 cooldowns:
-  default: 300   # raffle.cooldown.default — 5 minutes (granted to all by default)
+  default: 300   # raffle.cooldown.default — 5 minutes (all players)
   vip:     180   # raffle.cooldown.vip    — 3 minutes
   mvp:     60    # raffle.cooldown.mvp    — 1 minute
 
 # ── Messages ───────────────────────────────────
-# All player-facing strings. Supports & colour codes.
-# Available placeholders: {prefix} {prize} {player} {seconds} {count} {item}
+# Supports: & codes, &#RRGGBB hex, <gradient:#HEX1:#HEX2>text</gradient>
+# Placeholders: {prefix} {prize} {player} {seconds} {count} {item}
 messages:
 
   # ── Per-player feedback ──────────────────────
@@ -30,42 +49,43 @@ messages:
   players-only:          "{prefix} &cThis command can only be used by players."
   raffle-already-active: "{prefix} &cA raffle is already in progress!"
   must-hold-item:        "{prefix} &cYou must be holding an item to start a raffle."
-  join-success:          "{prefix} &aYou've entered the raffle — good luck!"
+  join-success:          "{prefix} &aYou've entered the raffle &7— &agood luck!"
   already-joined:        "{prefix} &eYou've already entered this raffle."
   creator-cannot-join:   "{prefix} &cYou can't enter your own raffle."
   no-active-raffle:      "{prefix} &cThere is no active raffle at the moment."
-  on-cooldown:           "{prefix} &cYou must wait &e{seconds}s &cbefore starting another raffle."
+  on-cooldown:           "{prefix} &cPlease wait &e{seconds}s &cbefore starting another raffle."
   prize-returned:        "{prefix} &aYour &e{prize} &ahas been returned to your inventory."
-  inventory-full-drop:   "{prefix} &eYour inventory is full — your prize was dropped at your feet."
-  pending-prize-received: "{prefix} &aWelcome back! Your pending prize has been delivered: &e{prize}&a."
-  pending-prize-full:    "{prefix} &eInventory full — your pending prize &e{prize} &ewas dropped at your feet."
-  raffle-cancelled:      "{prefix} &cThe raffle was cancelled by &e{player}&c. The prize is being returned."
-  config-reloaded:       "{prefix} &aConfiguration reloaded successfully."
+  inventory-full-drop:   "{prefix} &eInventory full &7— &eyour prize was dropped at your feet."
+  pending-prize-received: "{prefix} &aWelcome back! Pending prize delivered: &e{prize}&a."
+  pending-prize-full:    "{prefix} &ePending prize &e{prize} &edropped at your feet &7(inventory full)&e."
+  raffle-cancelled:      "{prefix} &cRaffle cancelled by &e{player}&c. Prize is being returned."
+  config-reloaded:       "{prefix} &aConfiguration reloaded."
 
-  # ── Announcement panel (broadcast on raffle start) ───
-  # These lines are auto-centered in chat.
+  # ── Announcement panel ────────────────────────
+  # Tip: use a gradient on the header for a nice effect:
+  #   announce-header: "<gradient:#FFD700:#FF8C00>&l✦ RAFFLE STARTED ✦</gradient>"
   announce-separator:   "&6&m                                        "
-  announce-header:      "&e&l✦ RAFFLE STARTED ✦"
-  announce-prize:       "&7Prize: &b&l{prize}"
-  announce-started-by:  "&7Started by: &f&l{player}"
-  announce-join-button: "&a&l[ Click here to join! ]"
+  announce-header:      "<gradient:#FFD700:#FF8C00>&l        ✦ RAFFLE STARTED ✦</gradient>"
+  announce-prize:       "&7  Prize:      <gradient:#00BFFF:#1E90FF>&l{prize}</gradient>"
+  announce-started-by:  "&7  Started by: &f&l{player}"
+  announce-join-button: "<gradient:#00C853:#64DD17>&l       [ Click here to join! ]</gradient>"
   announce-join-hover:  "&eClick to join the raffle!"
-  announce-warning:     "&c⚠ Make sure you have a free inventory slot!"
+  announce-warning:     "&c  ⚠ &7Make sure you have a free inventory slot!"
 
-  # ── Countdown (broadcast at 30s, 20s, 10s, 5-1s) ────
-  countdown:            "&6[Raffle] &e{seconds}s &7remaining for &b{prize} &8— &aClick to join!"
+  # ── Countdown ─────────────────────────────────
+  countdown:            "{prefix} &e{seconds}s &7remaining for &b{prize} &8— &aClick to join!"
   countdown-hover:      "&eClick to join the raffle!"
 
-  # ── Resolution broadcasts ─────────────────────
-  entries-closed:       "&6[Raffle] &7Entries closed for &b{prize} &7(&e{count} participant(s)&7)."
-  drawing:              "&6[Raffle] &eDrawing a winner&7..."
+  # ── Resolution ────────────────────────────────
+  entries-closed:       "{prefix} &7Entries closed for &b{prize} &7(&e{count} entrant(s)&7)."
+  drawing:              "{prefix} <gradient:#AAAAAA:#FFFFFF>Drawing a winner&7...</gradient>"
 
-  # ── Winner panel (auto-centered) ─────────────
+  # ── Winner panel ──────────────────────────────
   winner-separator:     "&6&m                                        "
-  winner-header:        "&6&l✦ RAFFLE WINNER ✦"
-  winner-name:          "&7Winner: &e&l{player}"
-  winner-prize:         "&7Prize:  &b&l{prize}"
-  winner-congrats:      "&a&lCongratulations!"
+  winner-header:        "<gradient:#FFD700:#FF8C00>&l        ✦ RAFFLE WINNER ✦</gradient>"
+  winner-name:          "&7  Winner: <gradient:#FFD700:#FFA500>&l{player}</gradient>"
+  winner-prize:         "&7  Prize:  <gradient:#00BFFF:#1E90FF>&l{prize}</gradient>"
+  winner-congrats:      "<gradient:#00C853:#64DD17>&l  Congratulations!</gradient>"
 
   # ── No participants ───────────────────────────
-  no-participants:      "&6[Raffle] &7The raffle for &b{prize} &7ended with no participants. Item returned to the host."
+  no-participants:      "{prefix} &7The raffle for &b{prize} &7ended with no participants. Item returned."

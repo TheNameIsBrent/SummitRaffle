@@ -1,6 +1,7 @@
 package com.summitcraft.summitraffle.command;
 
 import com.summitcraft.summitraffle.config.ConfigManager;
+import com.summitcraft.summitraffle.util.ColorParser;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
@@ -10,14 +11,15 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
  * Thin facade over {@link ConfigManager} that builds player-facing strings and
  * Adventure Components.
  *
- * <p>All text originates from config.yml. Messages support the {@code {prefix}}
- * placeholder which is substituted at read-time.</p>
+ * <p>All text originates from config.yml. Strings may contain:</p>
+ * <ul>
+ *   <li>{@code &6}, {@code &l} etc. — legacy colour/format codes</li>
+ *   <li>{@code &#RRGGBB} — inline hex colour</li>
+ *   <li>{@code <gradient:#HEX1:#HEX2>text</gradient>} — gradient text</li>
+ * </ul>
  *
  * <h3>Centering</h3>
- * <p>Uses Minecraft's actual per-character pixel widths (default resource pack,
- * normal style). Bold characters add 1px per glyph. Chat width is 320px;
- * a space is 4px wide (3px glyph + 1px shadow). Centering is best-effort —
- * client-side chat scaling can shift things slightly.</p>
+ * <p>Uses Minecraft's per-character pixel widths. Chat width = 320px.</p>
  */
 public final class Messages {
 
@@ -29,26 +31,20 @@ public final class Messages {
         config = configManager;
     }
 
-    // ── Character width table (px, normal style, default font) ────────────────
-    // Source: Minecraft's font/default.json glyph sizes
-    // Bold adds +1px per character (tracked via isBold flag in stripAndMeasure)
+    // ── Character width table ─────────────────────────────────────────────────
 
     private static int charWidth(char c) {
         return switch (c) {
-            case 'f', 'i', 'l', 't', ' '             -> 4;
-            case 'k'                                  -> 5;
-            case 'I', '!', ',', '.', ':', ';',
-                 '|', '\'', '`'                       -> 2;
-            case '"'                                  -> 5;
-            case '(', ')', '*', '7'                   -> 6;
-            case '\u2019'                             -> 5; // right single quote
-            default                                   -> 6;
+            case 'f', 'i', 'l', 't', ' '                     -> 4;
+            case 'k'                                          -> 5;
+            case 'I', '!', ',', '.', ':', ';', '|', '\'', '`' -> 2;
+            case '"'                                          -> 5;
+            case '(', ')', '*', '7'                           -> 6;
+            case '\u2019'                                     -> 5;
+            default                                           -> 6;
         };
     }
 
-    /**
-     * Measures the pixel width of a §-coded string, accounting for bold (+1px/char).
-     */
     private static int measureWidth(String text) {
         int width = 0;
         boolean bold = false;
@@ -56,91 +52,101 @@ public final class Messages {
             char c = text.charAt(i);
             if (c == '§' && i + 1 < text.length()) {
                 char code = Character.toLowerCase(text.charAt(i + 1));
-                bold = code == 'l';
+                if (code == 'l') bold = true;
                 if (code == 'r') bold = false;
-                i++; // skip the code char
+                i++;
+                continue;
+            }
+            // Skip hex inline sequences (§x§R§R§G§G§B§B)
+            if (c == '§' && i + 1 < text.length() && text.charAt(i + 1) == 'x') {
+                i += 13; // §x + 6×(§+hex digit)
                 continue;
             }
             int w = charWidth(c);
-            if (bold) w++; // bold adds 1px shadow offset
-            width += w + 1; // +1 for the inter-character shadow pixel
+            if (bold) w++;
+            width += w + 1;
         }
         return width;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private static String msg(String key, String... replacements) {
-        String s = config.getMessage(key);
-        for (int i = 0; i + 1 < replacements.length; i += 2) {
-            s = s.replace("{" + replacements[i] + "}", replacements[i + 1]);
+    /** Fetches raw message, substitutes named placeholders, returns raw string. */
+    private static String raw(String key, String... kv) {
+        String s = config.getRawMessage(key);
+        for (int i = 0; i + 1 < kv.length; i += 2) {
+            s = s.replace("{" + kv[i] + "}", kv[i + 1]);
         }
         return s;
     }
 
-    private static Component comp(String key, String... replacements) {
-        return LegacyComponentSerializer.legacySection().deserialize(msg(key, replacements));
-    }
-
     /**
-     * Returns a Component padded so the text is centered in a 320px chat window.
-     * Space char = 4px. We subtract 1px from the leading space to account for
-     * the shadow pixel on the space itself.
+     * Returns a legacy §-coded string for use with {@code sender.sendMessage(String)}.
+     * Hex and gradient tags are stripped gracefully (gradients are not supported
+     * in plain-string messages — use Component variants for those).
      */
-    private static Component centered(String key, String... replacements) {
-        String text = msg(key, replacements);
-        int textWidth = measureWidth(text);
-        int spaces = Math.max(0, (320 - textWidth) / 2 / 4);
-        return LegacyComponentSerializer.legacySection()
-                .deserialize(" ".repeat(spaces) + text);
+    private static String str(String key, String... kv) {
+        // For per-player feedback we serialize via legacy so it stays as a String.
+        // Gradient tags are left as-is by legacy serializer (they come through as text),
+        // so we strip them to avoid visible tag text in plain messages.
+        String r = raw(key, kv);
+        r = r.replaceAll("(?i)<gradient:[^>]+>", "").replaceAll("(?i)</gradient>", "");
+        return LegacyComponentSerializer.legacyAmpersand().serialize(
+                ColorParser.parse(r));
     }
 
-    /** Center a pre-built Component by prepending measured spaces from a plain text reference. */
+    /** Parses a raw config string into a full Adventure Component. */
+    private static Component comp(String key, String... kv) {
+        return ColorParser.parse(raw(key, kv));
+    }
+
+    /** Parses and centers a Component in the 320px chat window. */
+    private static Component centered(String key, String... kv) {
+        String r = raw(key, kv);
+        // Measure stripping all codes
+        String plain = r.replaceAll("(?i)<gradient:[^>]+>|</gradient>", "")
+                        .replaceAll("&[0-9a-fk-orA-FK-OR#](?:[0-9a-fA-F]{6})?", "");
+        int spaces = Math.max(0, (320 - measureWidth(plain) * 2) / 2 / 4);
+        Component pad = Component.text(" ".repeat(spaces));
+        return pad.append(ColorParser.parse(r));
+    }
+
+    /** Centers a pre-built Component using a plain-text reference for width. */
     private static Component centeredComp(String plainRef, Component built) {
-        int textWidth = measureWidth(plainRef);
-        int spaces = Math.max(0, (320 - textWidth) / 2 / 4);
+        String plain = plainRef.replaceAll("&[0-9a-fk-orA-FK-OR]", "");
+        int spaces = Math.max(0, (320 - measureWidth(plain)) / 2 / 4);
         return Component.text(" ".repeat(spaces)).append(built);
     }
 
-    // ── Per-player feedback ───────────────────────────────────────────────────
+    // ── Per-player feedback (String) ──────────────────────────────────────────
 
-    public static String usage()               { return msg("usage"); }
-    public static String noPermission()        { return msg("no-permission"); }
-    public static String playersOnly()         { return msg("players-only"); }
-    public static String raffleAlreadyActive() { return msg("raffle-already-active"); }
-    public static String mustHoldItem()        { return msg("must-hold-item"); }
-    public static String joinSuccess()         { return msg("join-success"); }
-    public static String alreadyJoined()       { return msg("already-joined"); }
-    public static String creatorCannotJoin()   { return msg("creator-cannot-join"); }
-    public static String noActiveRaffle()      { return msg("no-active-raffle"); }
-    public static String onCooldown(int secs)  { return msg("on-cooldown", "seconds", String.valueOf(secs)); }
-    public static String prizeReturnedToCreator(String prize) { return msg("prize-returned", "prize", prize); }
-    public static String inventoryFullItemDropped(String item) { return msg("inventory-full-drop", "item", item); }
-    public static String pendingPrizeReceived(String prize)   { return msg("pending-prize-received", "prize", prize); }
-    public static String pendingPrizeFull(String item)        { return msg("pending-prize-full", "prize", item); }
-    public static String raffleCancelled(String prize, String cancellerName) {
-        return msg("raffle-cancelled", "prize", prize, "player", cancellerName);
-    }
-    public static String configReloaded() { return msg("config-reloaded"); }
+    public static String usage()               { return str("usage"); }
+    public static String noPermission()        { return str("no-permission"); }
+    public static String playersOnly()         { return str("players-only"); }
+    public static String raffleAlreadyActive() { return str("raffle-already-active"); }
+    public static String mustHoldItem()        { return str("must-hold-item"); }
+    public static String joinSuccess()         { return str("join-success"); }
+    public static String alreadyJoined()       { return str("already-joined"); }
+    public static String creatorCannotJoin()   { return str("creator-cannot-join"); }
+    public static String noActiveRaffle()      { return str("no-active-raffle"); }
+    public static String configReloaded()      { return str("config-reloaded"); }
+    public static String onCooldown(int s)     { return str("on-cooldown", "seconds", String.valueOf(s)); }
+    public static String prizeReturnedToCreator(String p) { return str("prize-returned", "prize", p); }
+    public static String inventoryFullItemDropped(String i) { return str("inventory-full-drop", "item", i); }
+    public static String pendingPrizeReceived(String p)    { return str("pending-prize-received", "prize", p); }
+    public static String pendingPrizeFull(String i)        { return str("pending-prize-full", "prize", i); }
 
-    public static Component raffleCancelledComponent(String prize, String cancellerName) {
-        return comp("raffle-cancelled", "prize", prize, "player", cancellerName);
-    }
-
-    // ── Adventure broadcasts ──────────────────────────────────────────────────
+    // ── Broadcast Components ──────────────────────────────────────────────────
 
     public static Component raffleStartedComponent(String prizeName, String starterName) {
-        String hoverText  = msg("announce-join-hover");
-        String buttonText = msg("announce-join-button");
+        String hoverRaw  = raw("announce-join-hover");
+        String buttonRaw = raw("announce-join-button");
+        // Strip codes for width measurement
+        String buttonPlain = buttonRaw.replaceAll("&[0-9a-fk-orA-FK-OR]|(?i)<gradient:[^>]+>|</gradient>", "");
 
-        // Strip §-codes from button text to measure its width for centering
-        String buttonPlain = buttonText.replaceAll("§[0-9a-fk-orA-FK-OR]", "");
-
-        Component joinButton = LegacyComponentSerializer.legacySection()
-                .deserialize(buttonText)
+        Component joinButton = ColorParser.parse(buttonRaw)
                 .clickEvent(ClickEvent.runCommand("/raffle join"))
-                .hoverEvent(HoverEvent.showText(
-                        LegacyComponentSerializer.legacySection().deserialize(hoverText)));
+                .hoverEvent(HoverEvent.showText(ColorParser.parse(hoverRaw)));
 
         return Component.empty()
                 .append(Component.newline())
@@ -149,19 +155,18 @@ public final class Messages {
                 .append(centered("announce-prize",      "prize",  prizeName)).append(Component.newline())
                 .append(centered("announce-started-by", "player", starterName)).append(Component.newline())
                 .append(Component.newline())
-                .append(centeredComp(buttonText, joinButton)).append(Component.newline())
+                .append(centeredComp(buttonPlain, joinButton)).append(Component.newline())
                 .append(Component.newline())
                 .append(centered("announce-warning")).append(Component.newline())
                 .append(centered("announce-separator")).append(Component.newline());
     }
 
     public static Component raffleCountdownComponent(String prizeName, int secondsLeft) {
-        String full      = msg("countdown", "seconds", String.valueOf(secondsLeft), "prize", prizeName);
-        String hoverText = msg("countdown-hover");
-        return LegacyComponentSerializer.legacySection().deserialize(full)
+        String hoverRaw = raw("countdown-hover");
+        String lineRaw  = raw("countdown", "seconds", String.valueOf(secondsLeft), "prize", prizeName);
+        return ColorParser.parse(lineRaw)
                 .clickEvent(ClickEvent.runCommand("/raffle join"))
-                .hoverEvent(HoverEvent.showText(
-                        LegacyComponentSerializer.legacySection().deserialize(hoverText)));
+                .hoverEvent(HoverEvent.showText(ColorParser.parse(hoverRaw)));
     }
 
     public static Component raffleClosedComponent(String prizeName, int count) {
@@ -185,5 +190,13 @@ public final class Messages {
 
     public static Component raffleNoParticipants(String prizeName) {
         return comp("no-participants", "prize", prizeName);
+    }
+
+    public static Component raffleCancelledComponent(String prize, String cancellerName) {
+        return comp("raffle-cancelled", "prize", prize, "player", cancellerName);
+    }
+
+    public static String raffleCancelled(String prize, String cancellerName) {
+        return str("raffle-cancelled", "prize", prize, "player", cancellerName);
     }
 }

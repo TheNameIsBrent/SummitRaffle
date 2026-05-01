@@ -1,6 +1,5 @@
 package com.summitcraft.summitraffle.config;
 
-import org.bukkit.ChatColor;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -9,16 +8,20 @@ import java.util.Map;
 
 /**
  * Loads and exposes typed values from config.yml.
- * Call {@link #reload()} to re-read at runtime.
+ *
+ * <p>Messages are stored <em>raw</em> (not pre-translated) so that
+ * {@link com.summitcraft.summitraffle.util.ColorParser} can handle
+ * legacy {@code &} codes, inline hex {@code &#RRGGBB}, and
+ * {@code <gradient:#HEX1:#HEX2>text</gradient>} tags at render time.</p>
  */
 public class ConfigManager {
 
     private final JavaPlugin plugin;
 
-    private String prefix;
+    private String rawPrefix;      // raw from config — not translated yet
     private int duration;
-    private Map<String, Integer> cooldownTiers; // permission suffix → seconds
-    private Map<String, String> rawMessages;    // config key → translated string
+    private Map<String, Integer> cooldownTiers;
+    private Map<String, String> rawMessages;   // raw, un-translated
 
     public ConfigManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -29,9 +32,10 @@ public class ConfigManager {
         plugin.saveDefaultConfig();
         plugin.reloadConfig();
 
-        prefix = color(plugin.getConfig().getString("prefix", "&6[SummitRaffle]&r"));
+        // Store raw — ColorParser will translate at render time
+        rawPrefix = plugin.getConfig().getString("prefix", "&6[SummitRaffle]&r");
 
-        // Load cooldown tiers
+        // Cooldown tiers
         cooldownTiers = new LinkedHashMap<>();
         ConfigurationSection cd = plugin.getConfig().getConfigurationSection("cooldowns");
         if (cd != null) {
@@ -45,37 +49,35 @@ public class ConfigManager {
 
         duration = plugin.getConfig().getInt("duration", 30);
 
-        // Load all messages
+        // Messages — raw strings, {prefix} substituted at getMessage() call time
         rawMessages = new LinkedHashMap<>();
         ConfigurationSection msgs = plugin.getConfig().getConfigurationSection("messages");
         if (msgs != null) {
             for (String key : msgs.getKeys(false)) {
-                rawMessages.put(key, color(msgs.getString(key, "")));
+                String val = msgs.getString(key, "");
+                rawMessages.put(key, val != null ? val : "");
             }
         }
     }
 
-    /** Returns the translated prefix (§-codes applied). */
-    public String getPrefix() { return prefix; }
+    /**
+     * Returns the raw prefix string (un-translated, may contain &/hex/gradient codes).
+     */
+    public String getRawPrefix() { return rawPrefix; }
 
     /** Returns the configured raffle duration in seconds. */
     public int getDuration() { return duration; }
 
     /**
-     * Returns a translated message string, with {prefix} replaced.
-     * Returns a fallback if the key is missing.
+     * Returns a raw message string with {prefix} substituted.
+     * Callers are responsible for passing this through
+     * {@link com.summitcraft.summitraffle.util.ColorParser#parse}.
      */
-    public String getMessage(String key) {
+    public String getRawMessage(String key) {
         String raw = rawMessages.getOrDefault(key, "&c[Missing message: " + key + "]");
-        return raw.replace("{prefix}", prefix);
+        return raw.replace("{prefix}", rawPrefix);
     }
 
     /** Returns the full cooldown tier map (permission suffix → seconds). */
-    public Map<String, Integer> getCooldownTiers() {
-        return cooldownTiers;
-    }
-
-    private static String color(String s) {
-        return s == null ? "" : ChatColor.translateAlternateColorCodes('&', s);
-    }
+    public Map<String, Integer> getCooldownTiers() { return cooldownTiers; }
 }
