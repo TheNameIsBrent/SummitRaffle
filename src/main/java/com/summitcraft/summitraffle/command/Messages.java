@@ -70,15 +70,8 @@ public final class Messages {
         String hoverRaw  = raw("announce-join-hover");
         String buttonRaw = raw("announce-join-button");
 
-        Component joinButton = ColorParser.parse(buttonRaw)
-                .clickEvent(ClickEvent.runCommand("/raffle join"))
-                .hoverEvent(HoverEvent.showText(ColorParser.parse(hoverRaw)));
-
-        // Join button needs special handling: parse the raw text for centering,
-        // then re-apply click/hover on the centered result
-        Component centeredButton = ColorParser.centerComponent(
-                ColorParser.parse(buttonRaw.replaceAll("(?i)^\\s*<center>|</center>\\s*$", "")),
-                buttonRaw.replaceAll("(?i)^\\s*<center>|</center>\\s*$", ""))
+        // Parse button (center tag handled by ColorParser), attach click/hover events
+        Component centeredButton = ColorParser.parse(buttonRaw)
                 .clickEvent(ClickEvent.runCommand("/raffle join"))
                 .hoverEvent(HoverEvent.showText(ColorParser.parse(hoverRaw)));
 

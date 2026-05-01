@@ -125,6 +125,7 @@ public final class ColorParser {
             case 'I', '!', ',', '.', ':', ';', '|', '\'', '`' -> 2;
             case '"'                                           -> 5;
             case '(', ')', '*', '7'                            -> 6;
+            case '\u25AC'                                      -> 8; // ▬ solid block
             default                                            -> 6;
         };
     }
