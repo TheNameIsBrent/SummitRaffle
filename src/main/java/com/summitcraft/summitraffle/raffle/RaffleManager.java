@@ -91,7 +91,7 @@ public class RaffleManager {
         // Return prize to creator
         returnToCreator(cancelled);
 
-        Bukkit.broadcast(Messages.raffleCancelledComponent(cancelled.getPrizeName(), cancellerName));
+        Bukkit.broadcast(Messages.raffleCancelled(cancelled.getPrizeName(), cancellerName));
         return Optional.of(cancelled);
     }
 
