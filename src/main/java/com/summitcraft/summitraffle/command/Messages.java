@@ -43,22 +43,6 @@ public final class Messages {
         return ColorParser.parse(raw(key, kv));
     }
 
-    /**
-     * Parse → centered Component.
-     * Used internally for panel lines that should always be centered
-     * regardless of whether the config string wraps them in {@code <center>}.
-     */
-    private static Component centered(String key, String... kv) {
-        return ColorParser.centerComponent(ColorParser.parse(
-                // strip <center> tags if the admin already added them — avoid double-centering
-                raw(key, kv).replaceAll("(?i)^\\s*<center>|</center>\\s*$", "")));
-    }
-
-    /** Center a pre-built Component (used for the clickable join button). */
-    private static Component centeredComp(Component built) {
-        return ColorParser.centerComponent(built);
-    }
-
     // ── Per-player feedback ───────────────────────────────────────────────────
 
     public static Component usage()               { return comp("usage"); }
@@ -90,17 +74,24 @@ public final class Messages {
                 .clickEvent(ClickEvent.runCommand("/raffle join"))
                 .hoverEvent(HoverEvent.showText(ColorParser.parse(hoverRaw)));
 
+        // Join button needs special handling: parse the raw text for centering,
+        // then re-apply click/hover on the centered result
+        Component centeredButton = ColorParser.centerComponent(ColorParser.parse(
+                buttonRaw.replaceAll("(?i)^\\s*<center>|</center>\\s*$", "")))
+                .clickEvent(ClickEvent.runCommand("/raffle join"))
+                .hoverEvent(HoverEvent.showText(ColorParser.parse(hoverRaw)));
+
         return Component.empty()
                 .append(Component.newline())
-                .append(centered("announce-separator")).append(Component.newline())
-                .append(centered("announce-header")).append(Component.newline())
-                .append(centered("announce-prize",      "prize",  prizeName)).append(Component.newline())
-                .append(centered("announce-started-by", "player", starterName)).append(Component.newline())
+                .append(comp("announce-separator")).append(Component.newline())
+                .append(comp("announce-header")).append(Component.newline())
+                .append(comp("announce-prize",      "prize",  prizeName)).append(Component.newline())
+                .append(comp("announce-started-by", "player", starterName)).append(Component.newline())
                 .append(Component.newline())
-                .append(centeredComp(joinButton)).append(Component.newline())
+                .append(centeredButton).append(Component.newline())
                 .append(Component.newline())
-                .append(centered("announce-warning")).append(Component.newline())
-                .append(centered("announce-separator")).append(Component.newline());
+                .append(comp("announce-warning")).append(Component.newline())
+                .append(comp("announce-separator")).append(Component.newline());
     }
 
     public static Component raffleCountdownComponent(String prizeName, int secondsLeft) {
@@ -122,12 +113,12 @@ public final class Messages {
     public static Component raffleWinner(String winnerName, String prizeName) {
         return Component.empty()
                 .append(Component.newline())
-                .append(centered("winner-separator")).append(Component.newline())
-                .append(centered("winner-header")).append(Component.newline())
-                .append(centered("winner-name",    "player", winnerName)).append(Component.newline())
-                .append(centered("winner-prize",   "prize",  prizeName)).append(Component.newline())
-                .append(centered("winner-congrats")).append(Component.newline())
-                .append(centered("winner-separator")).append(Component.newline());
+                .append(comp("winner-separator")).append(Component.newline())
+                .append(comp("winner-header")).append(Component.newline())
+                .append(comp("winner-name",    "player", winnerName)).append(Component.newline())
+                .append(comp("winner-prize",   "prize",  prizeName)).append(Component.newline())
+                .append(comp("winner-congrats")).append(Component.newline())
+                .append(comp("winner-separator")).append(Component.newline());
     }
 
     public static Component raffleNoParticipants(String prizeName) {
