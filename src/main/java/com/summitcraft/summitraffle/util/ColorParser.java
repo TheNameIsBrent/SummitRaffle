@@ -37,8 +37,10 @@ public final class ColorParser {
     private static final Pattern CENTER =
             Pattern.compile("(?i)^\\s*<center>(.*)</center>\\s*$", Pattern.DOTALL);
 
-    /** Chat window pixel width (default Minecraft UI at normal scaling) */
-    private static final int CHAT_WIDTH_PX = 320;
+    /** Usable chat pixel width. Minecraft default chat is 320px minus 1px border each side. */
+    private static final int CHAT_WIDTH_PX = 318;
+    /** A regular space glyph is 3px + 1px shadow = 4px total. */
+    private static final int SPACE_WIDTH_PX = 4;
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -77,7 +79,7 @@ public final class ColorParser {
      */
     public static Component centerComponent(Component content, String rawSource) {
         int textPx = measureRaw(rawSource);
-        int spaces = Math.max(0, (CHAT_WIDTH_PX - textPx) / 2 / 4);
+        int spaces = Math.max(0, (CHAT_WIDTH_PX - textPx) / 2 / SPACE_WIDTH_PX);
         return Component.text(" ".repeat(spaces)).append(content);
     }
 
@@ -90,7 +92,7 @@ public final class ColorParser {
         String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
                 .plainText().serialize(content);
         int textPx = measureWidth(plain, false);
-        int spaces = Math.max(0, (CHAT_WIDTH_PX - textPx) / 2 / 4);
+        int spaces = Math.max(0, (CHAT_WIDTH_PX - textPx) / 2 / SPACE_WIDTH_PX);
         return Component.text(" ".repeat(spaces)).append(content);
     }
 
@@ -162,8 +164,8 @@ public final class ColorParser {
                 char code = Character.toLowerCase(s.charAt(i + 1));
                 if (code == 'l') { bold = true;  i++; continue; }
                 if (code == 'r') { bold = false; i++; continue; }
-                // Any other & code — skip it, it's not visible
-                if ("0123456789abcdefkmno".indexOf(code) >= 0) { i++; continue; }
+                // Any other & code — skip it (colour, format, all non-visible)
+                if ("0123456789abcdefkmnor".indexOf(code) >= 0) { i++; continue; }
             }
             int cw = charWidth(c);
             if (bold) cw++;
