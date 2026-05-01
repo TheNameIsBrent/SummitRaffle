@@ -10,9 +10,13 @@ import net.kyori.adventure.text.event.HoverEvent;
  * All player-facing messages, sourced from config.yml and rendered via
  * {@link ColorParser}.
  *
- * <p>Every method returns an Adventure {@link Component} — never a raw String.
- * This ensures hex colours and gradients are never accidentally serialized
- * back to the BungeeCord §x§R§R§G§G§B§B format before reaching the player.</p>
+ * <p>Supported in config.yml:</p>
+ * <ul>
+ *   <li>{@code &6}, {@code &l}, {@code &r} — legacy colour/format codes</li>
+ *   <li>{@code &#RRGGBB} — inline hex colour</li>
+ *   <li>{@code <gradient:#HEX1:#HEX2>text</gradient>} — gradient</li>
+ *   <li>{@code <center>text</center>} — centers the line in chat</li>
+ * </ul>
  */
 public final class Messages {
 
@@ -24,28 +28,8 @@ public final class Messages {
         config = configManager;
     }
 
-    // ── Character width table ─────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private static int charWidth(char c) {
-        return switch (c) {
-            case 'f', 'i', 'l', 't', ' '                      -> 4;
-            case 'k'                                           -> 5;
-            case 'I', '!', ',', '.', ':', ';', '|', '\'', '`' -> 2;
-            case '"'                                           -> 5;
-            case '(', ')', '*', '7'                            -> 6;
-            default                                            -> 6;
-        };
-    }
-
-    private static int measureWidth(String plain) {
-        int w = 0;
-        for (char c : plain.toCharArray()) w += charWidth(c) + 1;
-        return w;
-    }
-
-    // ── Internal helpers ──────────────────────────────────────────────────────
-
-    /** Fetch raw config string, substitute {key} placeholders. */
     private static String raw(String key, String... kv) {
         String s = config.getRawMessage(key);
         for (int i = 0; i + 1 < kv.length; i += 2) {
@@ -54,38 +38,28 @@ public final class Messages {
         return s;
     }
 
-    /** Parse raw string → Component. Used for all messages. */
+    /** Parse → Component. <center>, gradients, hex, & codes all handled. */
     private static Component comp(String key, String... kv) {
         return ColorParser.parse(raw(key, kv));
     }
 
     /**
-     * Parse and center a Component in Minecraft's 320px chat window.
-     * Strips all codes to measure plain-text width, then pads with spaces.
+     * Parse → centered Component.
+     * Used internally for panel lines that should always be centered
+     * regardless of whether the config string wraps them in {@code <center>}.
      */
     private static Component centered(String key, String... kv) {
-        String r = raw(key, kv);
-        // Strip gradient tags, &codes, &#hex to get plain text for measurement
-        String plain = r
-                .replaceAll("(?i)<gradient:[^>]*>|</gradient>", "")
-                .replaceAll("(?i)&#[0-9A-Fa-f]{6}", "")
-                .replaceAll("(?i)&[0-9a-fk-or]", "");
-        int spaces = Math.max(0, (320 - measureWidth(plain)) / 2 / 4);
-        return Component.text(" ".repeat(spaces)).append(ColorParser.parse(r));
+        return ColorParser.centerComponent(ColorParser.parse(
+                // strip <center> tags if the admin already added them — avoid double-centering
+                raw(key, kv).replaceAll("(?i)^\\s*<center>|</center>\\s*$", "")));
     }
 
-    /** Center a pre-built Component using a raw string as the width reference. */
-    private static Component centeredRaw(String rawRef, Component built) {
-        String plain = rawRef
-                .replaceAll("(?i)<gradient:[^>]*>|</gradient>", "")
-                .replaceAll("(?i)&#[0-9A-Fa-f]{6}", "")
-                .replaceAll("(?i)&[0-9a-fk-or]", "");
-        int spaces = Math.max(0, (320 - measureWidth(plain)) / 2 / 4);
-        return Component.text(" ".repeat(spaces)).append(built);
+    /** Center a pre-built Component (used for the clickable join button). */
+    private static Component centeredComp(Component built) {
+        return ColorParser.centerComponent(built);
     }
 
     // ── Per-player feedback ───────────────────────────────────────────────────
-    // All return Component so hex/gradient colours reach the client intact.
 
     public static Component usage()               { return comp("usage"); }
     public static Component noPermission()        { return comp("no-permission"); }
@@ -98,10 +72,10 @@ public final class Messages {
     public static Component noActiveRaffle()      { return comp("no-active-raffle"); }
     public static Component configReloaded()      { return comp("config-reloaded"); }
     public static Component onCooldown(int s)     { return comp("on-cooldown",  "seconds", String.valueOf(s)); }
-    public static Component prizeReturnedToCreator(String p) { return comp("prize-returned",        "prize", p); }
-    public static Component inventoryFullItemDropped(String i){ return comp("inventory-full-drop",   "item",  i); }
-    public static Component pendingPrizeReceived(String p)   { return comp("pending-prize-received","prize", p); }
-    public static Component pendingPrizeFull(String i)       { return comp("pending-prize-full",    "prize", i); }
+    public static Component prizeReturnedToCreator(String p) { return comp("prize-returned",         "prize", p); }
+    public static Component inventoryFullItemDropped(String i){ return comp("inventory-full-drop",    "item",  i); }
+    public static Component pendingPrizeReceived(String p)   { return comp("pending-prize-received", "prize", p); }
+    public static Component pendingPrizeFull(String i)       { return comp("pending-prize-full",     "prize", i); }
     public static Component raffleCancelled(String prize, String by) {
         return comp("raffle-cancelled", "prize", prize, "player", by);
     }
@@ -123,7 +97,7 @@ public final class Messages {
                 .append(centered("announce-prize",      "prize",  prizeName)).append(Component.newline())
                 .append(centered("announce-started-by", "player", starterName)).append(Component.newline())
                 .append(Component.newline())
-                .append(centeredRaw(buttonRaw, joinButton)).append(Component.newline())
+                .append(centeredComp(joinButton)).append(Component.newline())
                 .append(Component.newline())
                 .append(centered("announce-warning")).append(Component.newline())
                 .append(centered("announce-separator")).append(Component.newline());

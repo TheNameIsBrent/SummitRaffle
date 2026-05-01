@@ -10,16 +10,18 @@
 #   Example:  &#FF5733Hello  →  renders "Hello" in #FF5733
 #
 # Gradient          <gradient:#HEX1:#HEX2>text</gradient>
-#   Fades each character from HEX1 to HEX2 across the text.
+#   Fades each character across the text.
 #   Example:  <gradient:#FF0000:#0000FF>Rainbow</gradient>
+#   Multi-stop:  <gradient:#FF0000:#FFFF00:#00FF00>R → Y → G</gradient>
+#   With formatting:  <gradient:#FFD700:#FFA500>&lBold Gold</gradient>
 #
-#   Multiple stops are supported (add as many as you like):
-#   <gradient:#FF0000:#FFFF00:#00FF00>Red → Yellow → Green</gradient>
+# Center            <center>text</center>
+#   Centers the line in the default Minecraft chat window.
+#   Example:  <center>&eWelcome!</center>
+#   Works with all other codes:
+#   <center><gradient:#FFD700:#FF8C00>&l✦ HELLO ✦</gradient></center>
 #
-#   You can also combine with formatting codes inside the gradient:
-#   <gradient:#FFD700:#FFA500>&lGolden Bold Text</gradient>
-#
-# All three syntaxes can be mixed freely in the same line.
+# All syntaxes can be mixed freely in any message.
 # ════════════════════════════════════════════════
 
 # Prefix shown wherever {prefix} appears in a message below.
@@ -73,12 +75,12 @@ messages:
   announce-warning:     "&c  ⚠ &7Make sure you have a free inventory slot!"
 
   # ── Countdown ─────────────────────────────────
-  countdown:            "{prefix} &e{seconds}s &7remaining for &b{prize} &8— &aClick to join!"
+  countdown:            "<center>{prefix} &e{seconds}s &7remaining for &b{prize} &8— &aClick to join!</center>"
   countdown-hover:      "&eClick to join the raffle!"
 
   # ── Resolution ────────────────────────────────
-  entries-closed:       "{prefix} &7Entries closed for &b{prize} &7(&e{count} entrant(s)&7)."
-  drawing:              "{prefix} <gradient:#AAAAAA:#FFFFFF>Drawing a winner&7...</gradient>"
+  entries-closed:       "<center>{prefix} &7Entries closed for &b{prize} &7(&e{count} entrant(s)&7).</center>"
+  drawing:              "<center>{prefix} <gradient:#AAAAAA:#FFFFFF>Drawing a winner...</gradient></center>"
 
   # ── Winner panel ──────────────────────────────
   winner-separator:     "&6&m                                        "

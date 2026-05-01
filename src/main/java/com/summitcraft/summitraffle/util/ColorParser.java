@@ -33,43 +33,68 @@ public final class ColorParser {
             Pattern.compile("(?i)<gradient:(#[0-9A-Fa-f]{6}(?::#[0-9A-Fa-f]{6})+)>(.*?)</gradient>",
                     Pattern.DOTALL);
 
-    // Matches &#RRGGBB hex tag
-    private static final Pattern HEX =
-            Pattern.compile("(?i)&#([0-9A-Fa-f]{6})");
+    /** Matches a <center> wrapper around any content */
+    private static final Pattern CENTER =
+            Pattern.compile("(?i)^\\s*<center>(.*)</center>\\s*$", Pattern.DOTALL);
 
-    // Matches any & code (&0-9, &a-f, &k-r — but NOT &#… which is hex)
-    private static final Pattern LEGACY_CODE =
-            Pattern.compile("(?i)&([0-9a-fk-or])");
+    /** Chat window pixel width (default Minecraft UI at normal scaling) */
+    private static final int CHAT_WIDTH_PX = 320;
 
     // ── Public API ────────────────────────────────────────────────────────────
 
     /**
      * Parses a raw config string into a fully styled Adventure Component.
-     * Supports legacy {@code &} codes, {@code &#RRGGBB} hex, and
-     * {@code <gradient:#HEX1:#HEX2>text</gradient>} blocks.
+     *
+     * <p>Supported syntax:</p>
+     * <ul>
+     *   <li>{@code &6}, {@code &l}, {@code &r} — legacy colour/format codes</li>
+     *   <li>{@code &#RRGGBB} — inline hex colour</li>
+     *   <li>{@code <gradient:#HEX1:#HEX2>text</gradient>} — gradient</li>
+     *   <li>{@code <center>text</center>} — centers the line in chat</li>
+     * </ul>
+     * All syntaxes can be combined freely.
      */
     public static Component parse(String input) {
         if (input == null || input.isEmpty()) return Component.empty();
 
+        // Handle <center> wrapper — strip the tag and pad the inner content
+        Matcher cm = CENTER.matcher(input);
+        if (cm.matches()) {
+            String inner = cm.group(1);
+            return centerComponent(parseInner(inner));
+        }
+
+        return parseInner(input);
+    }
+
+    /**
+     * Measures the pixel width of the plain-text content of a Component
+     * and prepends enough space characters to center it in {@link #CHAT_WIDTH_PX}.
+     */
+    public static Component centerComponent(Component content) {
+        // Extract plain text to measure width
+        String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+                .plainText().serialize(content);
+        int textPx  = measureWidth(plain);
+        int spaces  = Math.max(0, (CHAT_WIDTH_PX - textPx) / 2 / 4);
+        return Component.text(" ".repeat(spaces)).append(content);
+    }
+
+    /** Internal: parse a string that has already had the <center> wrapper stripped. */
+    private static Component parseInner(String input) {
         TextComponent.Builder root = Component.text();
 
-        // Split around gradient blocks; process each piece in order
         Matcher gm = GRADIENT.matcher(input);
         int cursor = 0;
 
         while (gm.find()) {
-            // Plain text before this gradient block
             if (gm.start() > cursor) {
                 parsePlainInto(root, input.substring(cursor, gm.start()), new FormatState());
             }
-            // Gradient block
-            String stops = gm.group(1);
-            String body  = gm.group(2);
-            root.append(buildGradient(stops, body));
+            root.append(buildGradient(gm.group(1), gm.group(2)));
             cursor = gm.end();
         }
 
-        // Remaining plain text
         if (cursor < input.length()) {
             parsePlainInto(root, input.substring(cursor), new FormatState());
         }
@@ -77,7 +102,24 @@ public final class ColorParser {
         return root.build();
     }
 
-    // ── Plain text parser (legacy + hex) ─────────────────────────────────────
+    // ── Character width (for centering) ──────────────────────────────────────
+
+    private static int charWidth(char c) {
+        return switch (c) {
+            case 'f', 'i', 'l', 't', ' '                      -> 4;
+            case 'k'                                           -> 5;
+            case 'I', '!', ',', '.', ':', ';', '|', '\'', '`' -> 2;
+            case '"'                                           -> 5;
+            case '(', ')', '*', '7'                            -> 6;
+            default                                            -> 6;
+        };
+    }
+
+    private static int measureWidth(String plain) {
+        int w = 0;
+        for (char c : plain.toCharArray()) w += charWidth(c) + 1;
+        return w;
+    }
 
     /**
      * Walks through a plain (non-gradient) segment character by character,
