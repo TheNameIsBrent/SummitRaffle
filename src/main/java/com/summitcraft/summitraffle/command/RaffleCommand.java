@@ -15,16 +15,6 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Handles all /raffle subcommands.
- *
- * <ul>
- *   <li>{@code /raffle start}  — hold item to start a raffle       (raffle.start)</li>
- *   <li>{@code /raffle join}   — enter the active raffle            (raffle.join)</li>
- *   <li>{@code /raffle stop}   — force-cancel, return prize         (raffle.stop)</li>
- *   <li>{@code /raffle reload} — reload config.yml                  (raffle.reload)</li>
- * </ul>
- */
 public class RaffleCommand implements CommandExecutor, TabCompleter {
 
     private static final String PERM_START  = "raffle.start";
@@ -40,13 +30,10 @@ public class RaffleCommand implements CommandExecutor, TabCompleter {
         this.cooldownManager = cooldownManager;
     }
 
-    // ── Dispatch ──────────────────────────────────────────────────────────────
-
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
         if (args.length == 0) { sender.sendMessage(Messages.usage()); return true; }
-
         switch (args[0].toLowerCase()) {
             case "start"  -> handleStart(sender);
             case "join"   -> handleJoin(sender);
@@ -57,34 +44,21 @@ public class RaffleCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    // ── /raffle start ─────────────────────────────────────────────────────────
-
     private void handleStart(CommandSender sender) {
-        if (!sender.hasPermission(PERM_START)) {
-            sender.sendMessage(Messages.noPermission()); return;
-        }
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage(Messages.playersOnly()); return;
-        }
-        if (raffleManager.isRaffleActive()) {
-            player.sendMessage(Messages.raffleAlreadyActive()); return;
-        }
+        if (!sender.hasPermission(PERM_START)) { sender.sendMessage(Messages.noPermission()); return; }
+        if (!(sender instanceof Player player)) { sender.sendMessage(Messages.playersOnly()); return; }
+        if (raffleManager.isRaffleActive())     { player.sendMessage(Messages.raffleAlreadyActive()); return; }
 
         int remaining = cooldownManager.getRemainingCooldown(player);
-        if (remaining > 0) {
-            player.sendMessage(Messages.onCooldown(remaining)); return;
-        }
+        if (remaining > 0) { player.sendMessage(Messages.onCooldown(remaining)); return; }
 
         ItemStack held = player.getInventory().getItemInMainHand();
-        if (held == null || held.getType().isAir()) {
-            player.sendMessage(Messages.mustHoldItem()); return;
-        }
+        if (held == null || held.getType().isAir()) { player.sendMessage(Messages.mustHoldItem()); return; }
 
         ItemStack prize = ItemStack.deserializeBytes(held.serializeAsBytes());
         player.getInventory().setItemInMainHand(null);
 
         Optional<Raffle> started = raffleManager.startRaffle(prize, player.getUniqueId(), player.getName());
-
         if (started.isPresent()) {
             cooldownManager.recordStart(player.getUniqueId());
         } else {
@@ -93,15 +67,9 @@ public class RaffleCommand implements CommandExecutor, TabCompleter {
         }
     }
 
-    // ── /raffle join ──────────────────────────────────────────────────────────
-
     private void handleJoin(CommandSender sender) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage(Messages.playersOnly()); return;
-        }
-        if (!player.hasPermission(PERM_JOIN)) {
-            player.sendMessage(Messages.noPermission()); return;
-        }
+        if (!(sender instanceof Player player)) { sender.sendMessage(Messages.playersOnly()); return; }
+        if (!player.hasPermission(PERM_JOIN))   { player.sendMessage(Messages.noPermission()); return; }
         switch (raffleManager.joinRaffle(player.getUniqueId())) {
             case SUCCESS             -> player.sendMessage(Messages.joinSuccess());
             case ALREADY_JOINED      -> player.sendMessage(Messages.alreadyJoined());
@@ -110,30 +78,18 @@ public class RaffleCommand implements CommandExecutor, TabCompleter {
         }
     }
 
-    // ── /raffle stop ──────────────────────────────────────────────────────────
-
     private void handleStop(CommandSender sender) {
-        if (!sender.hasPermission(PERM_STOP)) {
-            sender.sendMessage(Messages.noPermission()); return;
-        }
-        if (!raffleManager.isRaffleActive()) {
-            sender.sendMessage(Messages.noActiveRaffle()); return;
-        }
+        if (!sender.hasPermission(PERM_STOP))  { sender.sendMessage(Messages.noPermission()); return; }
+        if (!raffleManager.isRaffleActive())   { sender.sendMessage(Messages.noActiveRaffle()); return; }
         String cancellerName = (sender instanceof Player p) ? p.getName() : "Console";
         raffleManager.forceStop(cancellerName);
     }
 
-    // ── /raffle reload ────────────────────────────────────────────────────────
-
     private void handleReload(CommandSender sender) {
-        if (!sender.hasPermission(PERM_RELOAD)) {
-            sender.sendMessage(Messages.noPermission()); return;
-        }
+        if (!sender.hasPermission(PERM_RELOAD)) { sender.sendMessage(Messages.noPermission()); return; }
         SummitRaffle.getInstance().reloadPlugin();
         sender.sendMessage(Messages.configReloaded());
     }
-
-    // ── Tab completion ────────────────────────────────────────────────────────
 
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
