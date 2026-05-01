@@ -35,6 +35,7 @@ public class RaffleCommand implements CommandExecutor, TabCompleter {
 
     private static final String PERM_START = "raffle.start";
     private static final String PERM_STOP  = "raffle.stop";
+    private static final String PERM_JOIN  = "raffle.join";
 
     private final RaffleManager raffleManager;
     private final CooldownManager cooldownManager;
@@ -107,6 +108,9 @@ public class RaffleCommand implements CommandExecutor, TabCompleter {
         if (!(sender instanceof Player player)) {
             sender.sendMessage(Messages.playersOnly()); return;
         }
+        if (!player.hasPermission(PERM_JOIN)) {
+            player.sendMessage(Messages.noPermission()); return;
+        }
         switch (raffleManager.joinRaffle(player.getUniqueId())) {
             case SUCCESS             -> player.sendMessage(Messages.joinSuccess());
             case ALREADY_JOINED      -> player.sendMessage(Messages.alreadyJoined());
@@ -147,6 +151,7 @@ public class RaffleCommand implements CommandExecutor, TabCompleter {
                 .filter(s -> switch (s) {
                     case "start" -> sender.hasPermission(PERM_START);
                     case "stop"  -> sender.hasPermission(PERM_STOP);
+                    case "join"  -> sender.hasPermission(PERM_JOIN);
                     default      -> true;
                 })
                 .toList();

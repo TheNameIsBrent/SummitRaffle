@@ -11,12 +11,13 @@ duration: 30
 
 # ── Cooldowns ──────────────────────────────────
 # Seconds a player must wait before starting another raffle.
-# Player receives the LOWEST cooldown they qualify for.
-# Permission node: raffle.<tier>
+# A player receives the LOWEST cooldown they qualify for.
+# Permission node format: raffle.cooldown.<tier>
+# Add as many tiers as you like — just give players the matching permission.
 cooldowns:
-  default: 300   # raffle.default — 5 minutes
-  vip:     180   # raffle.vip    — 3 minutes
-  mvp:     60    # raffle.mvp    — 1 minute
+  default: 300   # raffle.cooldown.default — 5 minutes (granted to all by default)
+  vip:     180   # raffle.cooldown.vip    — 3 minutes
+  mvp:     60    # raffle.cooldown.mvp    — 1 minute
 
 # ── Messages ───────────────────────────────────
 # All player-facing strings. Supports & colour codes.

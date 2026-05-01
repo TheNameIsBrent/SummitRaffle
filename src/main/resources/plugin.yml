@@ -12,21 +12,33 @@ commands:
     aliases: [ rf ]
 
 permissions:
-  raffle.start:
-    description: Allows starting a raffle (hold item in hand).
-    default: op
+
+  # ── Admin ─────────────────────────────────────
   raffle.stop:
-    description: Allows force-stopping an active raffle (returns item to creator).
+    description: Force-cancel an active raffle. Prize is returned to the creator.
     default: op
+
+  # ── Starting ──────────────────────────────────
+  # raffle.start grants the ability to run /raffle start.
+  # Cooldown is determined separately by whichever raffle.cooldown.<tier>
+  # permission the player holds — they receive the LOWEST value they qualify for.
+  raffle.start:
+    description: Allows starting a raffle by holding an item and running /raffle start.
+    default: op
+
+  raffle.cooldown.default:
+    description: "Default start cooldown tier. Cooldown duration set in config.yml under cooldowns.default (default: 300s)."
+    default: true
+
+  raffle.cooldown.vip:
+    description: "VIP start cooldown tier. Cooldown duration set in config.yml under cooldowns.vip (default: 180s)."
+    default: false
+
+  raffle.cooldown.mvp:
+    description: "MVP start cooldown tier. Cooldown duration set in config.yml under cooldowns.mvp (default: 60s)."
+    default: false
+
+  # ── Joining ───────────────────────────────────
   raffle.join:
-    description: Allows joining an active raffle.
+    description: Allows entering an active raffle with /raffle join.
     default: true
-  raffle.default:
-    description: Default cooldown tier (300s unless overridden in config).
-    default: true
-  raffle.vip:
-    description: VIP cooldown tier (180s by default).
-    default: false
-  raffle.mvp:
-    description: MVP cooldown tier (60s by default).
-    default: false

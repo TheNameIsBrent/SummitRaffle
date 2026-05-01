@@ -62,7 +62,7 @@ public class CooldownManager {
         int lowest = tiers.getOrDefault("default", 300);
         for (Map.Entry<String, Integer> entry : tiers.entrySet()) {
             if (entry.getKey().equals("default")) continue;
-            if (player.hasPermission("raffle." + entry.getKey())) {
+            if (player.hasPermission("raffle.cooldown." + entry.getKey())) {
                 lowest = Math.min(lowest, entry.getValue());
             }
         }
