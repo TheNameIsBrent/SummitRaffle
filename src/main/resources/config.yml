@@ -25,7 +25,7 @@ cooldowns:
 messages:
 
   # ── Per-player feedback ──────────────────────
-  usage:                 "{prefix} &7Usage: /raffle <start|join|stop>"
+  usage:                 "{prefix} &7Usage: /raffle <start|join|stop|reload>"
   no-permission:         "{prefix} &cYou don't have permission to do that."
   players-only:          "{prefix} &cThis command can only be used by players."
   raffle-already-active: "{prefix} &cA raffle is already in progress!"
@@ -40,6 +40,7 @@ messages:
   pending-prize-received: "{prefix} &aWelcome back! Your pending prize has been delivered: &e{prize}&a."
   pending-prize-full:    "{prefix} &eInventory full — your pending prize &e{prize} &ewas dropped at your feet."
   raffle-cancelled:      "{prefix} &cThe raffle was cancelled by &e{player}&c. The prize is being returned."
+  config-reloaded:       "{prefix} &aConfiguration reloaded successfully."
 
   # ── Announcement panel (broadcast on raffle start) ───
   # These lines are auto-centered in chat.

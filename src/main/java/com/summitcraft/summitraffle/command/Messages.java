@@ -121,6 +121,7 @@ public final class Messages {
     public static String raffleCancelled(String prize, String cancellerName) {
         return msg("raffle-cancelled", "prize", prize, "player", cancellerName);
     }
+    public static String configReloaded() { return msg("config-reloaded"); }
 
     public static Component raffleCancelledComponent(String prize, String cancellerName) {
         return comp("raffle-cancelled", "prize", prize, "player", cancellerName);

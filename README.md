@@ -28,6 +28,7 @@ A production-ready raffle plugin for [Paper](https://papermc.io/) Minecraft serv
 | `/raffle start` | `raffle.start` | Hold an item and run this to start a raffle. The item is taken from your hand. |
 | `/raffle join` | `raffle.join` | Enter the currently active raffle. Clickable from chat. |
 | `/raffle stop` | `raffle.stop` | Force-cancel the active raffle. The prize is returned to the creator. |
+| `/raffle reload` | `raffle.reload` | Reload `config.yml` without restarting the server. Safe to run mid-raffle. |
 
 **Alias:** `/rf` works as a shorthand for `/raffle`.
 
@@ -40,6 +41,7 @@ A production-ready raffle plugin for [Paper](https://papermc.io/) Minecraft serv
 | Permission | Default | Description |
 |---|---|---|
 | `raffle.stop` | `op` | Force-cancel an active raffle. Prize is returned to the creator immediately (or on next login if offline). |
+| `raffle.reload` | `op` | Reload `config.yml` at runtime. Messages, cooldowns, prefix, and duration all update immediately. A raffle in progress is not interrupted. |
 
 ### Starting a Raffle
 

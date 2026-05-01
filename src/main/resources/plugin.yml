@@ -8,7 +8,7 @@ authors: [ SummitCraft ]
 commands:
   raffle:
     description: Main raffle command.
-    usage: /raffle <start|join|stop>
+    usage: /raffle <start|join|stop|reload>
     aliases: [ rf ]
 
 permissions:
@@ -16,6 +16,10 @@ permissions:
   # ── Admin ─────────────────────────────────────
   raffle.stop:
     description: Force-cancel an active raffle. Prize is returned to the creator.
+    default: op
+
+  raffle.reload:
+    description: Reload config.yml without restarting the server.
     default: op
 
   # ── Starting ──────────────────────────────────

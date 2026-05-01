@@ -54,6 +54,17 @@ public final class SummitRaffle extends JavaPlugin {
     public PendingPrizeManager getPendingPrizeManager(){ return pendingPrizeManager; }
     public RaffleManager getRaffleManager()            { return raffleManager; }
 
+    /**
+     * Reloads config.yml and refreshes all config-dependent state.
+     * Safe to call while a raffle is active — the running raffle is not interrupted.
+     */
+    public void reloadPlugin() {
+        configManager.reload();
+        Messages.init(configManager);
+        // CooldownManager reads config at check-time so no explicit reload needed
+        getLogger().info("SummitRaffle config reloaded.");
+    }
+
     private void registerCommands() {
         RaffleCommand cmd = new RaffleCommand(raffleManager, cooldownManager);
         var bukkitCmd = getCommand("raffle");
