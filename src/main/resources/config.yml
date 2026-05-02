@@ -66,7 +66,7 @@ messages:
   # ── Announcement panel ────────────────────────
   announce-separator:   "<center>&6&m-------------------------------------&r</center>"
   announce-header:      "<center><gradient:#FFD700:#FF8C00>&l* RAFFLE STARTED *</gradient></center>"
-  announce-prize:       "<center>&7Prize: <gradient:#00BFFF:#1E90FF>&l{prize}</gradient></center>"
+  announce-prize:       "<center>&7Prize: {prize}</center>"
   announce-started-by:  "<center>&7Started by: &f&l{player}</center>"
   announce-join-button: "<center><gradient:#00C853:#64DD17>&l[ Click here to join! ]</gradient></center>"
   announce-join-hover:  "&eClick to join the raffle!"
@@ -84,7 +84,7 @@ messages:
   winner-separator:     "<center>&6&m-------------------------------------&r</center>"
   winner-header:        "<center><gradient:#FFD700:#FF8C00>&l* RAFFLE WINNER *</gradient></center>"
   winner-name:          "<center>&7Winner: <gradient:#FFD700:#FFA500>&l{player}</gradient></center>"
-  winner-prize:         "<center>&7Prize: <gradient:#00BFFF:#1E90FF>&l{prize}</gradient></center>"
+  winner-prize:         "<center>&7Prize: {prize}</center>"
   winner-congrats:      "<center><gradient:#00C853:#64DD17>&lCongratulations!</gradient></center>"
 
   # ── No participants ───────────────────────────

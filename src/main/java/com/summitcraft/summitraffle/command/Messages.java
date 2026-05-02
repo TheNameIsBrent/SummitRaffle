@@ -40,22 +40,26 @@ public final class Messages {
     }
 
     /**
-     * Builds a Component from a config key, but substitutes {prize} with a
-     * pre-built prize Component rather than a plain string — preserving colours.
+     * Builds a Component from a config key, substituting {prize} with the
+     * pre-built prize Component so its original colours are preserved.
      *
-     * <p>Strategy: split the raw string on the literal "{prize}" placeholder,
-     * parse each half, and sandwich the prize Component between them.</p>
+     * <p>Any gradient or hex tag that directly wraps {@code {prize}} in the
+     * config string is stripped — the item's own colours take over.</p>
      */
     private static Component compWithPrize(String key, Component prizeComp, String... extras) {
         String r = config.getRawMessage(key);
-        // Apply any extra substitutions first (e.g. {player}, {count})
         for (int i = 0; i + 1 < extras.length; i += 2) {
             r = r.replace("{" + extras[i] + "}", extras[i + 1]);
         }
 
-        // Split on {prize} and sandwich the Component between
+        // Strip gradient or hex-colour tags that immediately surround {prize}
+        // e.g. "<gradient:#00BFFF:#1E90FF>{prize}</gradient>" → "{prize}"
+        // e.g. "&#FF5733{prize}" → "{prize}"  (hex resets before prize anyway)
+        r = r.replaceAll("(?i)<gradient:[^>]+>\\{prize\\}</gradient>", "{prize}");
+        r = r.replaceAll("(?i)&#[0-9A-Fa-f]{6}(\\{prize\\})", "$1");
+
         int idx = r.indexOf("{prize}");
-        if (idx < 0) return ColorParser.parse(r); // no {prize} in this message
+        if (idx < 0) return ColorParser.parse(r);
 
         String before = r.substring(0, idx);
         String after  = r.substring(idx + "{prize}".length());
@@ -157,17 +161,20 @@ public final class Messages {
      */
     private static Component prizeLineComponent(String key, Component prizeComp) {
         String r = config.getRawMessage(key);
-        int idx = r.indexOf("{prize}");
 
+        // Strip gradient/hex wrappers directly around {prize}
+        r = r.replaceAll("(?i)<gradient:[^>]+>\\{prize\\}</gradient>", "{prize}");
+        r = r.replaceAll("(?i)&#[0-9A-Fa-f]{6}(\\{prize\\})", "$1");
+
+        int idx = r.indexOf("{prize}");
         if (idx < 0) return comp(key);
 
-        // For centering: measure the template with plain prize name substituted
-        String plainPrize = PlainTextComponentSerializer.plainText().serialize(prizeComp);
-        String forMeasure = r.replace("{prize}", plainPrize);
-        // Strip <center> tag from measurement string
-        forMeasure = forMeasure.replaceAll("(?i)^\\s*<center>|</center>\\s*$", "");
+        // For centering: substitute plain prize name for width measurement
+        String plainPrize  = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+                .plainText().serialize(prizeComp);
+        String forMeasure  = r.replace("{prize}", plainPrize)
+                .replaceAll("(?i)^\\s*<center>|</center>\\s*$", "");
 
-        // Build actual component
         String before = r.substring(0, idx)
                 .replaceAll("(?i)^\\s*<center>", "");
         String after  = r.substring(idx + "{prize}".length())
@@ -177,8 +184,7 @@ public final class Messages {
                 .append(prizeComp)
                 .append(ColorParser.parse(after));
 
-        // Only center if the config key had <center>
-        if (r.matches("(?i)\\s*<center>.*</center>\\s*")) {
+        if (r.matches("(?is)\\s*<center>.*</center>\\s*")) {
             return ColorParser.centerComponent(full, forMeasure);
         }
         return full;
