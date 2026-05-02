@@ -96,15 +96,18 @@ public class PendingPrizeManager implements Listener {
                 continue;
             }
 
+            // Get the prize name as a Component to preserve colours
+            net.kyori.adventure.text.Component itemName = itemNameComponent(item);
+
             // Attempt to give via addItem; overflow drops at feet
             var overflow = player.getInventory().addItem(item);
             if (!overflow.isEmpty()) {
                 for (ItemStack dropped : overflow.values()) {
                     player.getWorld().dropItemNaturally(player.getLocation(), dropped);
                 }
-                player.sendMessage(Messages.pendingPrizeFull(item.getType().name()));
+                player.sendMessage(Messages.pendingPrizeFull(itemName));
             } else {
-                player.sendMessage(Messages.pendingPrizeReceived(friendlyName(item)));
+                player.sendMessage(Messages.pendingPrizeReceived(itemName));
             }
         }
 
@@ -146,17 +149,23 @@ public class PendingPrizeManager implements Listener {
         }
     }
 
-    private static String friendlyName(ItemStack item) {
-        if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
-            return item.getItemMeta().getDisplayName();
+    private static net.kyori.adventure.text.Component itemNameComponent(ItemStack item) {
+        net.kyori.adventure.text.Component base;
+        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+        if (meta != null && meta.hasDisplayName()) {
+            base = meta.displayName(); // full colour Component from Adventure API
+        } else {
+            String raw = item.getType().name().replace('_', ' ');
+            StringBuilder sb = new StringBuilder();
+            for (String word : raw.split(" ")) {
+                if (!sb.isEmpty()) sb.append(' ');
+                sb.append(Character.toUpperCase(word.charAt(0)))
+                  .append(word.substring(1).toLowerCase());
+            }
+            base = net.kyori.adventure.text.Component.text(sb.toString());
         }
-        String raw = item.getType().name().replace('_', ' ');
-        StringBuilder sb = new StringBuilder();
-        for (String word : raw.split(" ")) {
-            if (!sb.isEmpty()) sb.append(' ');
-            sb.append(Character.toUpperCase(word.charAt(0)))
-              .append(word.substring(1).toLowerCase());
-        }
-        return item.getAmount() > 1 ? item.getAmount() + "x " + sb : sb.toString();
+        return item.getAmount() > 1
+                ? net.kyori.adventure.text.Component.text(item.getAmount() + "x ").append(base)
+                : base;
     }
 }

@@ -3,6 +3,7 @@ package com.summitcraft.summitraffle.raffle;
 import com.summitcraft.summitraffle.command.Messages;
 import com.summitcraft.summitraffle.logging.LogManager;
 import com.summitcraft.summitraffle.prize.PendingPrizeManager;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -49,10 +50,10 @@ public class WinnerResolver {
     // ── No-participants path ──────────────────────────────────────────────────
 
     private void handleNoParticipants(Raffle raffle) {
-        Bukkit.broadcast(Messages.raffleNoParticipants(raffle.getPrizeName()));
+        Bukkit.broadcast(Messages.raffleNoParticipants(raffle.getPrizeNameComponent()));
         logManager.logRaffleEnd(raffle.getPrizeName(), null, null, raffle.getParticipants(), false);
         logger.info("Raffle ended with no participants — prize: " + raffle.getPrizeName());
-        deliverOrQueue(raffle.getCreatorUUID(), raffle.getPrizeItem(), raffle.getPrizeName(), true);
+        deliverOrQueue(raffle.getCreatorUUID(), raffle.getPrizeItem(), raffle.getPrizeNameComponent(), true);
     }
 
     // ── Winner path ───────────────────────────────────────────────────────────
@@ -77,29 +78,23 @@ public class WinnerResolver {
                 raffle.getParticipants(), online);
 
         if (online) {
-            Bukkit.broadcast(Messages.raffleWinner(winner.getName(), raffle.getPrizeName()));
+            Bukkit.broadcast(Messages.raffleWinner(winner.getName(), raffle.getPrizeNameComponent()));
             logger.info("Raffle winner: " + winner.getName() + " — prize: " + raffle.getPrizeName());
-            deliverOrQueue(winnerUUID, raffle.getPrizeItem(), raffle.getPrizeName(), false);
+            deliverOrQueue(winnerUUID, raffle.getPrizeItem(), raffle.getPrizeNameComponent(), false);
         } else {
             logger.warning("Winner " + name + " (" + winnerUUID + ") is offline — prize queued.");
             pendingPrizeManager.queuePrize(winnerUUID, raffle.getPrizeItem());
-            Bukkit.broadcast(Messages.raffleWinner(name, raffle.getPrizeName()));
+            Bukkit.broadcast(Messages.raffleWinner(name, raffle.getPrizeNameComponent()));
         }
     }
 
-    /**
-     * Resolves a player name for a UUID that may be offline.
-     * Paper's OfflinePlayer caches the last known name from previous sessions.
-     */
     private String resolveOfflineName(UUID uuid) {
         String cached = Bukkit.getOfflinePlayer(uuid).getName();
         return cached != null ? cached : uuid.toString();
     }
 
-    // ── Delivery ──────────────────────────────────────────────────────────────
-
     private void deliverOrQueue(UUID recipientUUID, ItemStack prize,
-                                String prizeName, boolean isCreator) {
+                                Component prizeName, boolean isCreator) {
         Player recipient = Bukkit.getPlayer(recipientUUID);
 
         if (recipient == null || !recipient.isOnline()) {
@@ -115,7 +110,7 @@ public class WinnerResolver {
             for (ItemStack dropped : overflow.values()) {
                 recipient.getWorld().dropItemNaturally(recipient.getLocation(), dropped);
             }
-            recipient.sendMessage(Messages.inventoryFullItemDropped(prize.getType().name()));
+            recipient.sendMessage(Messages.inventoryFullItemDropped(prizeName));
         }
     }
 

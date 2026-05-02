@@ -66,7 +66,7 @@ public class RaffleManager {
                 starterName, activeRaffle.getPrizeName(), duration));
         logManager.logRaffleStart(starterName, creatorUUID, activeRaffle.getPrizeName(), duration);
 
-        Bukkit.broadcast(Messages.raffleStartedComponent(activeRaffle.getPrizeName(), starterName));
+        Bukkit.broadcast(Messages.raffleStartedComponent(activeRaffle.getPrizeNameComponent(), starterName));
         scheduleCountdown(duration);
         return Optional.of(activeRaffle);
     }
@@ -91,7 +91,7 @@ public class RaffleManager {
         // Return prize to creator
         returnToCreator(cancelled);
 
-        Bukkit.broadcast(Messages.raffleCancelled(cancelled.getPrizeName(), cancellerName));
+        Bukkit.broadcast(Messages.raffleCancelled(cancelled.getPrizeNameComponent(), cancellerName));
         return Optional.of(cancelled);
     }
 
@@ -161,7 +161,7 @@ public class RaffleManager {
                     countdownTaskId = -1;
 
                     Bukkit.broadcast(Messages.raffleClosedComponent(
-                            finished.getPrizeName(), finished.getParticipantCount()));
+                            finished.getPrizeNameComponent(), finished.getParticipantCount()));
 
                     new BukkitRunnable() {
                         @Override public void run() { Bukkit.broadcast(Messages.raffleDrawing()); }
@@ -179,7 +179,7 @@ public class RaffleManager {
                         || secondsLeft == 10
                         || secondsLeft <= 5) {
                     Bukkit.broadcast(Messages.raffleCountdownComponent(
-                            activeRaffle.getPrizeName(), secondsLeft));
+                            activeRaffle.getPrizeNameComponent(), secondsLeft));
                 }
                 secondsLeft--;
             }
@@ -208,9 +208,9 @@ public class RaffleManager {
             var overflow = creator.getInventory().addItem(prize);
             if (!overflow.isEmpty()) {
                 overflow.values().forEach(i -> creator.getWorld().dropItemNaturally(creator.getLocation(), i));
-                creator.sendMessage(Messages.inventoryFullItemDropped(prize.getType().name()));
+                creator.sendMessage(Messages.inventoryFullItemDropped(raffle.getPrizeNameComponent()));
             } else {
-                creator.sendMessage(Messages.prizeReturnedToCreator(raffle.getPrizeName()));
+                creator.sendMessage(Messages.prizeReturnedToCreator(raffle.getPrizeNameComponent()));
             }
         } else {
             pendingPrizeManager.queuePrize(creatorUUID, prize);
